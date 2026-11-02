@@ -63,6 +63,33 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         changed_policy = self.new(bag_policy=BagPolicy.LEGACY)
         self.assertEqual(changed_policy.restore_snapshot(saved), 0)
 
+    async def test_restored_away_does_not_establish_house_empty(self):
+        initial = self.new()
+        await initial.process("child", Event.IPHONE_LEFT, event_time=self.time)
+        saved = initial.snapshot()
+        self.values["reference"] = "unavailable"
+        restored = self.new()
+        self.assertEqual(restored.restore_snapshot(saved), 1)
+        self.assertEqual(restored.state("child"), State.AWAY)
+        self.assertIsNone(restored.all_away())  # Stale snapshot cannot arm alarm.
+
+        # A fresh observed transition clears the restored-only quality marker.
+        self.values["bag"] = "off"
+        await restored.process("child", Event.RECONCILE, event_time=self.time)
+        # State was already AWAY; no new trusted transition was observed.
+        self.assertIsNone(restored.all_away())
+        self.values["phone"] = "home"
+        # Bag OFF prevents false HOME and cannot clear stale state.
+        await restored.process("child", Event.IPHONE_ARRIVED, event_time=self.time)
+        self.assertIsNone(restored.all_away())
+        # A genuine OFF->ON bag arrival is accepted as fresh HOME evidence.
+        self.values["bag"] = "on"
+        await restored.process("child", Event.BAG_ARRIVED, event_time=self.time)
+        self.assertIs(restored.all_away(), False)
+        self.values["phone"] = "not_home"
+        await restored.process("child", Event.IPHONE_LEFT, event_time=self.time)
+        self.assertIs(restored.all_away(), True)
+
     async def test_near_home_snapshot_has_unknown_age_after_restart(self):
         self.values["reference"] = "away"
         first = self.new()

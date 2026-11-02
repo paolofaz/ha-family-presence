@@ -373,8 +373,22 @@ class ShadowCoordinator:
         ]
 
     def all_away(self) -> bool | None:
-        """Unknown member presence never produces a positive all-away verdict."""
-        values = [rt.state for rt in self.runtime.values()]
-        if not values or any(value is None for value in values):
+        """Conservative internal verdict: stale restored states never prove absence.
+
+        A confirmed HOME or NEAR_HOME means not all away. An absent member
+        snapshot or unknown state means we cannot establish certainty. Only
+        when every member has a non-restored AWAY state is the verdict True.
+        This is still an internal shadow calculation, not an HA entity.
+        """
+        runtimes = tuple(self.runtime.values())
+        if not runtimes:
             return None
-        return all(value == State.AWAY for value in values)
+        if any(
+            rt.state in (State.HOME, State.NEAR_HOME)
+            and not rt.restored_from_storage
+            for rt in runtimes
+        ):
+            return False
+        if any(rt.state is None or rt.restored_from_storage for rt in runtimes):
+            return None
+        return True

@@ -38,7 +38,7 @@ One household configuration entry, an arbitrary number of people, optional per-p
 
 The read-only shadow state is initialized from a valid reference helper **once** at setup and never written back. If it is missing, a saved state is optionally restored only when its source mapping fingerprint matches the current configuration. A restored state is marked `restored_from_storage` and cannot be treated as authoritative for alarms. If neither exists, state remains unknown. No historical physical evidence survives a reboot. Every decision logs the reason and current reference helper; `[shadow][blocked]` logs bag-vetoed entry hypotheses. Shadow source changes also refresh reference/quality attributes.
 
-The in-memory `all_away()` returns unknown if any member is uninitialized. **There is no all-away binary sensor or production HA presence entity yet.** There is one read-only `sensor.family_presence_shadow_...` per person, with `mode=shadow_only`, source information, last reason, last transition and comparison to the legacy helper. It is a diagnostic surface only. Users must not migrate any YAML action to it.
+The in-memory `all_away()` returns unknown if any member is uninitialized **or has only a restored, potentially stale shadow state**. A freshly observed `home` or `near_home` rules out all-away, but only non-restored states can establish confirmed all-away. **There is no all-away binary sensor or production HA presence entity yet.** There is one read-only `sensor.family_presence_shadow_...` per person, with `mode=shadow_only`, source information, last reason, last transition and comparison to the legacy helper. It is a diagnostic surface only. Users must not migrate any YAML action to it.
 
 ## Provisional near-home state
 
@@ -46,7 +46,7 @@ The in-memory `all_away()` returns unknown if any member is uninitialized. **The
 
 ## Configuration boundary
 
-The **Options** menu provides only two actions: edit the six physical-event correlation windows, or select a person with a configured bag and edit their `always`/`legacy` priority policy. OptionsFlowWithReload restarts the **shadow** runtime to apply the new settings. It preserves other options and the stable per-person IDs. Mappings/add/remove people are separate future reconfiguration operations; BLE scan/presence timeouts remain with their BLE source integrations.
+The **Options** menu provides only two actions: edit the six physical-event correlation windows, or select a person with a configured bag and edit their `always`/`legacy` priority policy. OptionsFlowWithReload restarts the **shadow** runtime to apply the new settings. It preserves other options and the stable per-person IDs. An additional **Reconfigure** flow edits the household/shared sensors and allows changing, adding or removing members while preserving stable person IDs. It refuses duplicate person-specific sensor sources and refuses to remove the last member. BLE scan/presence timeouts remain with their BLE source integrations.
 
 No arbitrary YAML/Jinja/Python conditions or generic rule editor will be supported. State transitions and invariant enforcement are tested Python behavior, not per-user scripts. See [configuration-policy.md](configuration-policy.md).
 
@@ -54,7 +54,7 @@ No arbitrary YAML/Jinja/Python conditions or generic rule editor will be support
 
 - Source-event ordering has initial per-person serialization and revision checks, but needs HA integration tests for rapid races, setup/teardown, source restores and concurrency.
 - Measure false bag OFF rates under the upstream 180s timeout and define an explicit, auditable manual override for a child returning without their bag, before live alarm migration.
-- Production-ready persistence, migration of legacy name-based IDs, editable source mappings and fully translated diagnostic entities. The current shadow snapshot is scoped to unchanged source mapping and uses the HA Store helper; it is not a production persistence guarantee.
+- Production-ready persistence, migration of all legacy name-based IDs and fully translated diagnostic entities. Source mapping reconfiguration is now implemented, but must be tested against a real HA config entry. The current shadow snapshot is scoped to unchanged source mapping and uses the HA Store helper; it is not a production persistence guarantee.
 - Build actual time-aligned parity comparisons with the original YAML. A snapshot in the log is not proof of parity.
 - Add a conservative all-away binary sensor **only after** reboot/unavailable behavior has been reviewed. The all-away output must not arm the alarm on uncertain states.
 - Test first in shadow mode against the existing package, then migrate selected outputs and finally independent YAML automations, deliberately and reversibly.

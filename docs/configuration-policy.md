@@ -13,8 +13,8 @@
 
 ## Configurable per household
 
-- Person mappings to phone tracker, Watch/BLE binary sensor, optional bag binary sensor, optional legacy helper.
-- Shared gate, door, lock and alarm entities.
+- Person mappings to phone tracker, Watch/BLE binary sensor, optional bag binary sensor, optional legacy helper. These are editable in **Reconfigure** without removing the entry. Users can also add/remove members; removing the last member is forbidden. Personal source entities cannot be shared between members.
+- Shared gate, door, lock and alarm entities, modified with the integration entry's **Reconfigure** action.
 - Six physical-event correlation time windows in **seconds** with original YAML defaults. Adjusted via Configure → Event correlation windows.
 - No Bluetooth scan or absence timeout settings: these belong to Beacon BLE Presence, Watch BLE Presence, or an alternative entity provider.
 
@@ -28,6 +28,12 @@ Only **backpack precedence** is exposed as an explicit behavioral policy, and on
 | `legacy` | Matches the previous YAML: bag on sets home; bag off sets away only in the weekday 07:00–09:10 local window, and other sources can override. |
 
 Go to **Configure → Backpack priority → choose person → choose policy**. A policy change is stored in `entry.options["bag_policies"][person_id]`, without altering person source identifiers. `OptionsFlowWithReload` reloads the shadow integration so it becomes active. Previous early config entries without `person_id` use a normalized name key for compatibility.
+
+## Configure versus Reconfigure (Home Assistant UI)
+
+**Configure** changes policy/settings (`entry.options`): six correlation windows and per-person bag precedence. **Reconfigure** changes setup data (`entry.data`): household name/common physical entities and the set of people and their source entity mappings. Reconfigure uses the existing entry's unique ID and reloads it; it never creates a second entry or edits YAML.
+
+New members receive stable IDs independent of their names. For early name-based entries, the first edit freezes the original normalized key into `person_id` to prevent a rename from changing entity identity. Source remapping invalidates stale shadow snapshots via the per-person fingerprint and reseeds from valid legacy YAML reference states when available.
 
 ## Deliberately not configurable yet
 

@@ -41,9 +41,9 @@ Under **Settings → Devices & Services → Family Presence → Configure**:
 - **Event correlation windows:** adjust the six gate/door/lock evidence windows. Values remain seconds, with the original YAML defaults.
 - **Backpack priority:** choose a member with a configured bag, then select `always` (strict absence priority) or `legacy` (original YAML morning-only bag departure). Overrides live in the entry's options and automatically reload the **shadow** integration without deleting the entry.
 
-Core FSM states, decision/event types, precedence between phone/Watch/physical inputs, and the two-second Watch observation delay remain in code, not user-defined expressions. The upstream Beacon BLE and Watch BLE absence timeouts are adjusted **only** in their respective integrations. Adding/removing members or remapping input entities is still planned as a separate reconfiguration flow.
+Core FSM states, decision/event types, precedence between phone/Watch/physical inputs, and the two-second Watch observation delay remain in code, not user-defined expressions. The upstream Beacon BLE and Watch BLE absence timeouts are adjusted **only** in their respective integrations. Use **Reconfigure** on the integration entry (separate from Configure) to change shared entrance sensors, edit a member's mapped phone/Watch/bag/reference, add a member or remove a member. Each member keeps a stable internal ID and duplicated personal sources are rejected.
 
-**Limitations:** log lines and diagnostic sensor comparisons include instantaneous legacy-state snapshots, not a synchronized parity report. HA event-adapter and new diagnostic sensor platform need real-world integration testing. Member/source entity edits still require rebuilding the config entry; timing windows and backpack policies can now be edited through Configure. Additional bag debounce, manual override, full production presence entities and all-away output are **not implemented**. Persisted shadow states are diagnostic-only and can be stale.
+**Limitations:** log lines and diagnostic sensor comparisons include instantaneous legacy-state snapshots, not a synchronized parity report. HA event-adapter and new diagnostic sensor platform need real-world integration testing. Member/source entity edits now use Reconfigure; timing windows and backpack policies use Configure. Neither operation touches the original YAML. Additional bag debounce, manual override, full production presence entities and all-away output are **not implemented**. Persisted shadow states are diagnostic-only and can be stale; a stored `away` state by itself never makes the internal all-away result true.
 
 ## Files
 
@@ -57,6 +57,7 @@ Core FSM states, decision/event types, precedence between phone/Watch/physical i
 - `docs/near-home.md`: rationale for preserving provisional near_home, alarm implications, and shadow diagnostics.
 - `docs/ble-sources.md`: reviewed beacon/Watch providers, 180s timing contracts and why not to merge all three integrations.
 - `docs/architecture.md`: architecture, transition semantics and migration roadmap.
+- `docs/shadow-test-plan.md`: safe real-world installation and validation checklist.
 - `tests/`: pure unit tests; run `python -m unittest discover -s tests -v`.
 - `.github/workflows/validate.yml`: unit tests, hassfest and HACS validation.
 
