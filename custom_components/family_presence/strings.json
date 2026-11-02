@@ -20,7 +20,8 @@
           "person_name": "Person name",
           "iphone_tracker": "Phone tracker (optional)",
           "watch_sensor": "BLE wearable sensor (optional)",
-          "bag_sensor": "Bag sensor (optional)"
+          "bag_sensor": "Bag sensor (optional)",
+          "bag_policy": "Bag absence priority (always / legacy)"
         }
       },
       "another": {

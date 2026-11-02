@@ -20,7 +20,8 @@
           "person_name": "Nome",
           "iphone_tracker": "Tracker telefono (facoltativo)",
           "watch_sensor": "Sensore BLE indossabile (facoltativo)",
-          "bag_sensor": "Sensore zaino (facoltativo)"
+          "bag_sensor": "Sensore zaino (facoltativo)",
+          "bag_policy": "Priorità zaino assente (always / legacy)"
         }
       },
       "another": {

@@ -38,3 +38,7 @@ The last-change timestamp helper only updates on display-state transitions invol
 ## Review before enabling
 
 Event ordering and simultaneous source updates; unknown/unavailable inputs; stale evidence; restart recovery; bag semantics; mapping legacy entity IDs into new stable entities. Shadow mode must precede any live switch.
+
+## Reviewed proposed change (not original YAML)
+
+Per-person bag policy `always` enforces an all-day, persistent `away` guard whenever a configured bag reports `off`. This blocks false arrival from charging Watch + a neighbor's gate; it is checked before phone, Watch and entrance events. `unknown`/`unavailable` is not `off`. Mode `legacy` keeps the original YAML behavior. See [bag-policy.md](bag-policy.md) for scenarios, drawbacks and migration precautions.

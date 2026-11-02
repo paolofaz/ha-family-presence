@@ -1,33 +1,61 @@
-# Architecture and implementation roadmap
+# Runtime architecture — target design
 
-## Component separation
+This repository currently stores a config entry and pure rules only. There are **no active presence listeners, state entities, persistent runtime state or alarm side effects** in the scaffold. Do not remove the original working YAML yet.
 
-Input entities (phone / BLE / gate / door / lock / bag / alarm)
--> HA event adapter [not implemented]
--> normalized evidence and validated timestamps [not implemented]
--> pure deterministic decide() in fsm.py [implemented baseline]
--> per-person serialized runtime with persistent state [not implemented]
--> HA state sensors, all-away binary sensor and diagnostics [not implemented]
--> downstream YAML actions (alarm, notifications, lights).
+## Layers
 
-There must be **one writer** of each FSM state. The FSM must never issue actuator commands itself.
+```text
+Shared inputs: gate / door / lock / alarm
+Person inputs: phone / Watch BLE / optional bag
+                |
+            sources.py                (planned)
+      normalize events and quality
+                |
+       correlator / coordinator.py     (planned)
+     timestamp windows + 2s Watch delay
+     current evidence snapshot per person
+                |
+              fsm.py                  (pure, implemented)
+        bag guard -> state transition
+                |
+           storage.py                 (planned)
+    single writer + restart restoration
+                |
+      sensor.py / binary_sensor.py     (planned)
+ raw FSM state, reason, timestamps,
+         household all-away
+                |
+        downstream YAML automations
+      alarm / heating / notifications
+```
+
+## Transition contract
+
+Each member has a separate FSM (`home`, `near_home`, `away`). Phone exits/arrivals, Watch OFF/ON, gate/door/lock corroboration and bag changes match [baseline.md](baseline.md), except selected strict bag precedence in [bag-policy.md](bag-policy.md).
+
+Watch OFF exit evidence is correlated with `last_seen_before_off` (gate <=120 seconds; door/lock <=90 seconds). Watch ON uses a 2-second delay and gate, opening and unlock evidence from <=120 seconds before evaluation. The engine must evaluate evidence at commit time, not cache it before sleeping.
+
+Shared gate events alone never identify a specific household member. Physical gate/door/lock evidence can only corroborate a person-specific source. When a bag is confirmed absent under `always`, that constraint beats *all* entry hypotheses.
 
 ## Configuration
 
-One household configuration entry; number of people is not hard-coded. Shared entrance sensors and each person's phone / wearable / bag sources are chosen through entity selectors. Time windows default to legacy values: departure gate=120, door=90, lock=90 seconds; arrival gate=120, door=120, unlock=120 seconds. Other policies (bag time window, 2s Watch delay) are left untouched until review.
+One household config entry. People are not hard-coded; each member has a stable internal identifier, display name, optional phone tracker, optional BLE watch, optional bag sensor and bag priority `always` or `legacy`. Shared sensors and timing windows are household-level. The initial UI currently stores people, sources, policy and correlation windows; mapping edits and runtime consumers remain to be implemented.
 
-The wizard is a first-stage scaffold; entity update / reconfiguration UX and event adapters are still required.
+Future scheduled bag policy may expose days, school time ranges and holidays. It is deliberately not active until specified and tested.
 
-## Guardrails before migration
+## State and diagnostics
 
-1. Review the reported bag edge case, without silently changing the existing policy.
-2. Specify priority and event ordering when phone, watch and bag disagree.
-3. Reject unknown/unavailable and startup restoration as arrival or departure evidence.
-4. Persist state and event metadata reliably across restarts.
-5. Add shadow-mode logging and test current versus candidate transitions.
-6. Expose stable entities, and only then migrate consumers away from the existing input_select helpers.
-7. Keep independent notification and alarm automations separate from the decision engine.
+Suggested stable entities: one `sensor` per person with raw state and attributes for last reason, state-change timestamp, last evidence and conflict status; one all-away `binary_sensor` reporting true only when every tracked member is confidently AWAY. Surface user-facing text in translations; never overload raw state with zone descriptions.
 
-## HACS-readiness, not publication
+Support manual override separately from sensor facts, with clear expiry and provenance. Persist the minimum required state and metadata across restarts; never replay an old gate event as new evidence. If source state is unknown, do not equate it to an absent person or bag. Event order is serialized per member to prevent a late BLE event overwriting a newer bag veto.
 
-The one-integration layout, manifest version, metadata, i18n and CI conventions follow custom integration expectations. A Home Assistant Brands entry and green HACS/hassfest checks are required for future public catalog submission; this repository is not HACS-published yet.
+## Migration plan
+
+1. Finish real-world bag sensor reliability and override behavior, then commit precise tests.
+2. Implement coordinator and event adapter in shadow mode; do not write replacement presence entities or trigger the alarm until parity is demonstrated.
+3. Add persistence and stable sensors, including conservative all-away and reasons.
+4. Compare all four original people and a user-configured extra person; simulate HA restart, delayed Watch ON, source unavailable, shared gate and bag conflict.
+5. Migrate downstream YAML to the new entities only after end-to-end verification.
+6. Complete config edits, docs, HACS validation, Home Assistant Brands and releases before considering publication.
+
+Alarm arming/disarming, heating reminder, unlocked-door warning and unrelated work-zone notifications remain in YAML. Family Presence must not call alarm, lock or heating services itself.
