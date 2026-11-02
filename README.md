@@ -2,7 +2,7 @@
 
 A configurable, multi-person Home Assistant presence FSM using phone zone tracking, BLE wearables, physical gate/door/lock events, and optional bag sensors.
 
-> **Experimental shadow build (0.1.0a1): DO NOT REPLACE YOUR EXISTING YAML.** The integration now subscribes to HA inputs and computes **in-memory shadow decisions only**. It does **not** register production sensor entities, modify legacy `input_select` values, persist its internal FSM, or control alarm/locks/heating. It has not yet been end-to-end tested inside a running Home Assistant instance.
+> **Experimental shadow build (0.1.0a1): DO NOT REPLACE YOUR EXISTING YAML.** The integration subscribes to HA inputs, records *shadow-only* state snapshots and exposes **diagnostic shadow sensors**, never production presence entities. It does **not** modify existing `input_select` values, or control alarm/locks/heating. It has not yet been end-to-end tested inside a running Home Assistant instance.
 
 ## Core behavior
 
@@ -13,7 +13,7 @@ A configurable, multi-person Home Assistant presence FSM using phone zone tracki
 - Bag policy `always`: a **currently OFF** bag forces `away` regardless of iPhone/Watch/door/gate. **OFF → ON** is a `home` event. With bag already ON, other sensors govern the FSM normally: bag presence does **not** permanently lock `home`.
 - Bag policy `legacy`: the earlier behavior, with bag OFF causing departure only during the weekday 07:00–09:10 window; no precedence veto.
 - `unknown` / `unavailable` is not OFF. Startup recovery does not invent arrival/departure transitions.
-- `all_away()` is calculated internally, returning unknown if any person's state is unknown; there is intentionally **no live all-away entity yet**.
+- `all_away()` is calculated internally, returning unknown if any person's state is unknown; **no all-away entity** is exposed and no shadow sensor should be used to arm/disarm alarms.
 
 ## Shadow setup (for safe testing)
 
@@ -21,7 +21,8 @@ A configurable, multi-person Home Assistant presence FSM using phone zone tracki
 2. Install the contents of `custom_components/family_presence/` under your HA `config/custom_components/family_presence/`. **This branch is experimental, not a release.**
 3. Restart Home Assistant and add **Family Presence** under Settings → Devices & Services. Map the physical inputs and people.
 4. For each existing person, select the corresponding `input_select.presenza_...` helper as **Legacy YAML presence helper**. It seeds the shadow FSM once on startup and is read for diagnostic comparisons; never written.
-5. To see decisions and blocked false arrivals, enable info logs:
+5. The experimental `sensor.family_presence_shadow_...` entities can display the simulated state, last transition/reason, bag-policy conflict and comparison with the corresponding YAML helper. They are marked as **diagnostic**, have `mode: shadow_only`, and **must never be used as automation triggers**.
+6. To see decisions and blocked false arrivals, enable info logs:
 
    ```yaml
    logger:
@@ -30,16 +31,17 @@ A configurable, multi-person Home Assistant presence FSM using phone zone tracki
        custom_components.family_presence: info
    ```
 
-6. Review log entries `[shadow]` and `[shadow][blocked]`. They are **observations**, not state changes. No alarm automations should be switched over to this integration.
+7. Review log entries `[shadow]` and `[shadow][blocked]`. They are **observations**, not state changes. No alarm automations should be switched over to this integration.
 
-Without a legacy helper, a shadow person may begin **unknown** until a decisive event is observed. On every restart, shadow state is re-seeded from the legacy helper if mapped, then the current bag OFF constraint is reconciled. Internal event history is intentionally reset at restart.
+On restart, the integration prefers a **currently valid YAML helper state**. If the helper is missing/unknown, a compatible saved shadow snapshot may be restored and is explicitly flagged `restored_from_storage`. A snapshot is accepted only for the **same per-person source mapping and bag policy**. If neither helper nor snapshot is available, state remains unknown until a decisive event. Only state/reason/last-change metadata are stored; **BLE event, gate and door timestamps are intentionally cleared at restart** to avoid accidental reused evidence. A valid bag OFF constraint is reconciled on startup.
 
-**Limitations:** log lines include an instantaneous legacy-state snapshot, not a synchronized/eventually-consistent parity report. HA event-adapter behavior and reconfiguration are not yet fully tested in Home Assistant. Entity edits currently require rebuilding the config entry. Bag debounce, persistent state, manual override, diagnostics entities, and all-away sensor are not implemented.
+**Limitations:** log lines and diagnostic sensor comparisons include instantaneous legacy-state snapshots, not a synchronized parity report. HA event-adapter and new diagnostic sensor platform need real-world integration testing. Entity edits currently require rebuilding the config entry. Additional bag debounce, manual override, full production presence entities and all-away output are **not implemented**. Persisted shadow states are diagnostic-only and can be stale.
 
 ## Files
 
 - `custom_components/family_presence/fsm.py`: pure transition rules.
-- `custom_components/family_presence/coordinator.py`: per-person serialized shadow decisions, timestamp evidence, revision control.
+- `custom_components/family_presence/coordinator.py`: per-person serialized decisions, timestamp evidence, revisions, source fingerprinting and state snapshot export/restore.
+- `custom_components/family_presence/sensor.py`: read-only simulated presence state and diagnostic attributes (not for automations).
 - `custom_components/family_presence/sources.py`: HA source subscriptions and normalization.
 - `custom_components/family_presence/config_flow.py`: household/person mapping and options.
 - `docs/baseline.md`: original YAML behavior.

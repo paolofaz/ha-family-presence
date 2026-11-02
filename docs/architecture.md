@@ -11,7 +11,8 @@ coordinator.py (per-person async lock; 2s Watch ON delay; current evidence)
      ↓
 fsm.py (pure decision rules; confirmed absent bag always wins)
      ↓
-in-memory shadow state + logs only (NO production entity writes)
+shadow state + diagnostic sensor entities + .storage snapshot
+          (NO production presence writes)
 ```
 
 Independent YAML automations continue controlling alarm, heating, warnings and notifications.
@@ -35,9 +36,9 @@ Family Presence consumes **standard Home Assistant entities** produced by indepe
 
 One household configuration entry, an arbitrary number of people, optional per-person reference `input_select`, phone/watch/bag entities, bag priority and household physical sources. Time windows live in options and follow the legacy defaults.
 
-The read-only shadow state is initialized from the reference helper **once** at setup and is never written back. If no helper is mapped and no decisive input arrives, state remains unknown. Every shadow decision logs its reason and the *current* reference-helper state. `[shadow][blocked]` logs entry hypotheses vetoed by absent bag.
+The read-only shadow state is initialized from a valid reference helper **once** at setup and never written back. If it is missing, a saved state is optionally restored only when its source mapping fingerprint matches the current configuration. A restored state is marked `restored_from_storage` and cannot be treated as authoritative for alarms. If neither exists, state remains unknown. No historical physical evidence survives a reboot. Every decision logs the reason and current reference helper; `[shadow][blocked]` logs bag-vetoed entry hypotheses. Shadow source changes also refresh reference/quality attributes.
 
-The in-memory `all_away()` returns unknown if any member is uninitialized. **There is no all-away binary sensor or HA presence entity yet.** Users must not migrate any YAML action to the new shadow engine.
+The in-memory `all_away()` returns unknown if any member is uninitialized. **There is no all-away binary sensor or production HA presence entity yet.** There is one read-only `sensor.family_presence_shadow_...` per person, with `mode=shadow_only`, source information, last reason, last transition and comparison to the legacy helper. It is a diagnostic surface only. Users must not migrate any YAML action to it.
 
 ## Provisional near-home state
 
@@ -47,7 +48,7 @@ The in-memory `all_away()` returns unknown if any member is uninitialized. **The
 
 - Source-event ordering has initial per-person serialization and revision checks, but needs HA integration tests for rapid races, setup/teardown, source restores and concurrency.
 - Measure false bag OFF rates under the upstream 180s timeout and define an explicit, auditable manual override for a child returning without their bag, before live alarm migration.
-- Build persistent internal state, stable person IDs, editable source mappings and fully translated diagnostic entities.
+- Production-ready persistence, stable person IDs, editable source mappings and fully translated diagnostic entities. The current shadow snapshot is scoped to unchanged source mapping and uses the HA Store helper; it is not a production persistence guarantee.
 - Build actual time-aligned parity comparisons with the original YAML. A snapshot in the log is not proof of parity.
 - Add a conservative all-away binary sensor **only after** reboot/unavailable behavior has been reviewed. The all-away output must not arm the alarm on uncertain states.
 - Test first in shadow mode against the existing package, then migrate selected outputs and finally independent YAML automations, deliberately and reversibly.

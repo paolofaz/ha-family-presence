@@ -108,7 +108,10 @@ class ShadowSourceAdapter:
         self._unsub: Any = None
         self._tasks: set[asyncio.Task] = set()
         self._person_inputs: dict[str, list[tuple[str, str]]] = {}
+        self._reference_inputs: dict[str, list[str]] = {}
         for p in engine.people.values():
+            if p.reference:
+                self._reference_inputs.setdefault(p.reference, []).append(p.key)
             for entity, kind in ((p.iphone, "iphone"), (p.watch, "watch"), (p.bag, "bag")):
                 if entity:
                     self._person_inputs.setdefault(entity, []).append((p.key, kind))
@@ -117,7 +120,7 @@ class ShadowSourceAdapter:
         self._lock = config.get(CONF_LOCK)
 
     def start(self) -> None:
-        entities = set(self._person_inputs) | self._gates
+        entities = set(self._person_inputs) | set(self._reference_inputs) | self._gates
         if self._door:
             entities.add(self._door)
         if self._lock:
@@ -151,6 +154,13 @@ class ShadowSourceAdapter:
         at = event.time_fired
         if old == new:
             return
+
+        # The old YAML helper can change independently of the shadow FSM.
+        # Update comparison attributes, but NEVER interpret it as a new event.
+        for key in self._reference_inputs.get(entity_id, ()):
+            self.engine.notify_source_update(key)
+        for key, _kind in self._person_inputs.get(entity_id, ()):
+            self.engine.notify_source_update(key)
 
         # Recovery from unknown/unavailable is NOT a new arrival/departure.
         # But a recovered OFF bag can reconcile the strict absence invariant.

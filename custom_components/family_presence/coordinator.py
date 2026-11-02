@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, tzinfo
-from typing import Awaitable, Callable
+from typing import Any, Awaitable, Callable
 
 from .fsm import BagPolicy, BagStatus, Decision, Event, Evidence, State, decide, recent_before, school_bag_window
 
@@ -58,6 +60,7 @@ class PersonRuntime:
     last_changed: datetime | None = None
     # Seeded near_home has unknown age; only newly observed entries have a timer.
     near_home_entered_at: datetime | None = None
+    restored_from_storage: bool = False
     last_blocked_event: Event | None = None
     last_blocked_at: datetime | None = None
     decisions: list[ShadowDecision] = field(default_factory=list)
@@ -120,6 +123,84 @@ class ShadowCoordinator:
         self.local_timezone = local_timezone
         self.report = report
         self.report_block = report_block
+        self._listeners: set[Callable[[str], None]] = set()
+
+    def async_add_listener(self, listener: Callable[[str], None]) -> Callable[[], None]:
+        """Register local shadow updates for diagnostic entities and storage."""
+        self._listeners.add(listener)
+        return lambda: self._listeners.discard(listener)
+
+    def _notify(self, person: str) -> None:
+        for listener in tuple(self._listeners):
+            listener(person)
+
+    def notify_source_update(self, person: str) -> None:
+        """Refresh shadow diagnostics for raw source and legacy helper changes."""
+        self._notify(person)
+
+    @staticmethod
+    def _fingerprint(person: PersonSources) -> str:
+        """Reject snapshots from prior source maps or changed bag policies."""
+        mapping = {
+            "iphone": person.iphone, "watch": person.watch,
+            "bag": person.bag, "reference": person.reference,
+            "bag_policy": person.bag_policy.value,
+        }
+        return hashlib.sha256(
+            json.dumps(mapping, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+
+    def snapshot(self) -> dict[str, Any]:
+        """Serializable shadow state only, never BLE observations or keys."""
+        return {
+            "format": 1,
+            "people": {
+                key: {
+                    "fingerprint": self._fingerprint(self.people[key]),
+                    "state": rt.state.value if rt.state is not None else None,
+                    "reason": rt.last_reason,
+                    "last_changed": rt.last_changed.isoformat() if rt.last_changed else None,
+                }
+                for key, rt in self.runtime.items()
+            },
+        }
+
+    def restore_snapshot(self, data: Any) -> int:
+        """Restore a shadow state only when no live legacy helper is available.
+
+        Physical evidence and near_home age are intentionally never restored.
+        A restored state is marked diagnostic-only, never proof for alarm use.
+        """
+        if not isinstance(data, dict) or data.get("format") != 1:
+            return 0
+        people = data.get("people")
+        if not isinstance(people, dict):
+            return 0
+        restored = 0
+        for key, rt in self.runtime.items():
+            config = self.people[key]
+            # A currently valid YAML reference is more authoritative than a
+            # saved shadow state and avoids stale shadow state after a restart.
+            if config.reference and parse_state(self._read(config.reference)) is not None:
+                continue
+            record = people.get(key)
+            if not isinstance(record, dict) or record.get("fingerprint") != self._fingerprint(config):
+                continue
+            parsed = parse_state(record.get("state"))
+            if parsed is None:
+                continue
+            rt.state = parsed
+            rt.last_reason = record.get("reason") if isinstance(record.get("reason"), str) else None
+            ts = record.get("last_changed")
+            if isinstance(ts, str):
+                try:
+                    rt.last_changed = _aware_utc(datetime.fromisoformat(ts))
+                except ValueError:
+                    rt.last_changed = None
+            rt.near_home_entered_at = None  # Unknown elapsed time at restart.
+            rt.restored_from_storage = True
+            restored += 1
+        return restored
 
     def note_person_event(self, person: str) -> int:
         """Monotonic per-person revision. Called synchronously on HA callback."""
@@ -211,6 +292,7 @@ class ShadowCoordinator:
                         person=person, event=event, when=rt.last_blocked_at,
                         reference=parse_state(self._read(config.reference)) if config.reference else None,
                     ))
+                self._notify(person)
 
             result: Decision | None = decide(rt.state, event, evidence, bag_policy=config.bag_policy)
             if result is None:
@@ -218,6 +300,7 @@ class ShadowCoordinator:
             previous = rt.state
             rt.state = result.state
             rt.last_reason = result.reason
+            rt.restored_from_storage = False
             when = _aware_utc(self._clock())
             near_home_duration: float | None = None
             if result.state != previous:
@@ -245,6 +328,7 @@ class ShadowCoordinator:
                 del rt.decisions[:-100]
             if self.report:
                 self.report(decision)
+            self._notify(person)
             return decision
 
     async def reconcile(self) -> list[ShadowDecision]:
