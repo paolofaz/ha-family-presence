@@ -35,6 +35,10 @@ The read-only shadow state is initialized from the reference helper **once** at 
 
 The in-memory `all_away()` returns unknown if any member is uninitialized. **There is no all-away binary sensor or HA presence entity yet.** Users must not migrate any YAML action to the new shadow engine.
 
+## Provisional near-home state
+
+`near_home` represents a pending Watch-based arrival without sufficient physical corroboration, not confirmed occupancy. The engine now measures the duration of observed provisional states; it **never expires them automatically**. The current all-away semantics remain conservative: one near-home member blocks `all_away=true`, while only `home` can trigger the independent return-alarm action. See [near-home.md](near-home.md).
+
 ## Safety limitations and upcoming tasks
 
 - Source-event ordering has initial per-person serialization and revision checks, but needs HA integration tests for rapid races, setup/teardown, source restores and concurrency.

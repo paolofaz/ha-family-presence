@@ -40,6 +40,7 @@ class ShadowDecision:
     reason: str
     when: datetime
     reference: State | None
+    near_home_duration_seconds: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +56,8 @@ class PersonRuntime:
     state: State | None = None
     last_reason: str | None = None
     last_changed: datetime | None = None
+    # Seeded near_home has unknown age; only newly observed entries have a timer.
+    near_home_entered_at: datetime | None = None
     last_blocked_event: Event | None = None
     last_blocked_at: datetime | None = None
     decisions: list[ShadowDecision] = field(default_factory=list)
@@ -216,8 +219,17 @@ class ShadowCoordinator:
             rt.state = result.state
             rt.last_reason = result.reason
             when = _aware_utc(self._clock())
+            near_home_duration: float | None = None
             if result.state != previous:
                 rt.last_changed = when
+                if previous == State.NEAR_HOME:
+                    if rt.near_home_entered_at is not None:
+                        near_home_duration = max(
+                            0.0, (when - rt.near_home_entered_at).total_seconds()
+                        )
+                    rt.near_home_entered_at = None
+                if result.state == State.NEAR_HOME:
+                    rt.near_home_entered_at = when
             decision = ShadowDecision(
                 person=person,
                 event=event,
@@ -226,6 +238,7 @@ class ShadowCoordinator:
                 reason=result.reason,
                 when=when,
                 reference=parse_state(self._read(config.reference)) if config.reference else None,
+                near_home_duration_seconds=near_home_duration,
             )
             rt.decisions.append(decision)
             if len(rt.decisions) > 100:
@@ -245,6 +258,35 @@ class ShadowCoordinator:
 
     def state(self, person: str) -> State | None:
         return self.runtime[person].state
+
+    def near_home_age_seconds(
+        self, person: str, *, now: datetime | None = None
+    ) -> float | None:
+        """Elapsed seconds in a known provisional near_home state.
+
+        No automatic transition is performed. A near_home state imported from
+        the legacy reference has unknown age until its next real transition.
+        """
+        rt = self.runtime[person]
+        if rt.state != State.NEAR_HOME or rt.near_home_entered_at is None:
+            return None
+        timestamp = _aware_utc(now if now is not None else self._clock())
+        return max(0.0, (timestamp - rt.near_home_entered_at).total_seconds())
+
+    def pending_near_home(
+        self, *, min_seconds: float, now: datetime | None = None
+    ) -> list[str]:
+        """Return observed, prolonged provisional states (diagnostic only)."""
+        if min_seconds < 0:
+            raise ValueError("Minimum seconds must not be negative")
+        return [
+            person
+            for person in self.people
+            if (
+                (age := self.near_home_age_seconds(person, now=now)) is not None
+                and age >= min_seconds
+            )
+        ]
 
     def all_away(self) -> bool | None:
         """Unknown member presence never produces a positive all-away verdict."""

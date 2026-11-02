@@ -44,6 +44,7 @@ Without a legacy helper, a shadow person may begin **unknown** until a decisive 
 - `custom_components/family_presence/config_flow.py`: household/person mapping and options.
 - `docs/baseline.md`: original YAML behavior.
 - `docs/bag-policy.md`: bag precedence design and safety risks.
+- `docs/near-home.md`: rationale for preserving provisional near_home, alarm implications, and shadow diagnostics.
 - `docs/architecture.md`: architecture, transition semantics and migration roadmap.
 - `tests/`: pure unit tests; run `python -m unittest discover -s tests -v`.
 - `.github/workflows/validate.yml`: unit tests, hassfest and HACS validation.

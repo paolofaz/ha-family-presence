@@ -76,6 +76,11 @@ def build_coordinator(hass: HomeAssistant, entry: Any) -> ShadowCoordinator:
             d.person, d.previous, d.current, d.event.value,
             d.reason, d.reference,
         )
+        if d.near_home_duration_seconds is not None:
+            _LOGGER.info(
+                "[shadow][near_home] %s: resolved after %.1f seconds -> %s",
+                d.person, d.near_home_duration_seconds, d.current.value,
+            )
 
     def report_block(block: ShadowBlocked) -> None:
         _LOGGER.info(

@@ -136,6 +136,64 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
         unknown = self.engine(people=[PersonSources("p1", "One"), PersonSources("p2", "Two")])
         self.assertIsNone(unknown.all_away())
 
+    async def test_near_home_is_provisional_not_home_or_away(self):
+        self.inputs.update({"bag": "on", "ref": "away", "phone": "not_home"})
+        c = self.engine()
+        result = await c.process("child", Event.WATCH_SEEN, event_time=self.now)
+        self.assertEqual(result.current, State.NEAR_HOME)
+        self.assertEqual(c.state("child"), State.NEAR_HOME)
+        self.assertIs(c.all_away(), False)
+        self.assertEqual(c.near_home_age_seconds("child"), 0.0)
+        self.now += timedelta(minutes=31)
+        self.assertEqual(c.pending_near_home(min_seconds=1800), ["child"])
+        self.assertEqual(c.state("child"), State.NEAR_HOME)  # NO automatic timeout.
+        self.assertEqual(c.near_home_age_seconds("child"), 31 * 60)
+
+    async def test_near_home_can_confirm_home_with_physical_event(self):
+        self.inputs.update({"bag": "on", "ref": "away", "phone": "not_home"})
+        c = self.engine()
+        await c.process("child", Event.WATCH_SEEN, event_time=self.now)
+        self.now += timedelta(seconds=25)
+        c.record_physical("door_open", self.now)
+        result = await c.process(
+            "child", Event.PHYSICAL_ENTRY,
+            event_time=self.now, physical_kind="door_open",
+        )
+        self.assertEqual(result.current, State.HOME)
+        self.assertEqual(result.near_home_duration_seconds, 25.0)
+        self.assertIsNone(c.near_home_age_seconds("child"))
+        self.assertEqual(c.pending_near_home(min_seconds=0), [])
+
+    async def test_near_home_watch_lost_returns_away(self):
+        self.inputs.update({"bag": "on", "ref": "away", "phone": "not_home"})
+        c = self.engine()
+        await c.process("child", Event.WATCH_SEEN, event_time=self.now)
+        self.now += timedelta(seconds=44)
+        self.inputs["watch"] = "off"
+        result = await c.process("child", Event.WATCH_LOST, event_time=self.now)
+        self.assertEqual(result.current, State.AWAY)
+        self.assertEqual(result.near_home_duration_seconds, 44.0)
+        self.assertEqual(c.all_away(), True)
+
+    async def test_imported_near_home_has_unknown_age(self):
+        self.inputs.update({"bag": "on", "ref": "near_home"})
+        c = self.engine()
+        self.assertEqual(c.state("child"), State.NEAR_HOME)
+        self.assertIsNone(c.near_home_age_seconds("child"))
+        self.now += timedelta(hours=3)
+        self.assertEqual(c.pending_near_home(min_seconds=1), [])
+        self.assertIs(c.all_away(), False)
+
+    async def test_phone_arrival_confirms_near_home_without_bag_lock(self):
+        self.inputs.update({"bag": "on", "ref": "away", "phone": "not_home"})
+        c = self.engine()
+        await c.process("child", Event.WATCH_SEEN, event_time=self.now)
+        self.now += timedelta(seconds=12)
+        self.inputs["phone"] = "home"
+        result = await c.process("child", Event.IPHONE_ARRIVED, event_time=self.now)
+        self.assertEqual(result.current, State.HOME)
+        self.assertEqual(result.near_home_duration_seconds, 12)
+
     def test_input_status_classification(self):
         self.assertEqual(bag_status("off", True), BagStatus.ABSENT)
         self.assertEqual(bag_status("on", True), BagStatus.PRESENT)
