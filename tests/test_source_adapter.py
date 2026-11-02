@@ -115,7 +115,7 @@ class SourceAdapterTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_stable_person_identifier_is_independent_of_display_name(self):
         config = {"people": [
-            {"person_name": "Giulia", "person_id": "stable-id-42",
+            {"person_name": "Member", "person_id": "stable-id-42",
              "iphone_tracker": "phone", "watch_sensor": "watch",
              "bag_sensor": "bag", "bag_policy": "always"}
         ]}
@@ -155,9 +155,9 @@ class SourceAdapterTests(unittest.IsolatedAsyncioTestCase):
                          [BagPolicy.LEGACY, BagPolicy.ALWAYS])
 
     async def test_legacy_name_based_policy_option_is_supported(self):
-        config = {"people": [{"person_name": "Giulia", "bag_sensor": "bag"}]}
+        config = {"people": [{"person_name": "Member", "bag_sensor": "bag"}]}
         specs = self.mod._person_specs(config, {
-            "bag_policies": {"giulia": "legacy"},
+            "bag_policies": {"member": "legacy"},
         })
         self.assertEqual(specs[0].bag_policy, BagPolicy.LEGACY)
 

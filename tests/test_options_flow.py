@@ -160,13 +160,13 @@ class OptionsFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await flow.async_step_bag_policy())["type"], "abort")
 
     async def test_legacy_name_based_entries_are_still_editable(self):
-        person = {"person_name": "Giulia", "bag_sensor": "binary_sensor.zaino"}
+        person = {"person_name": "Member", "bag_sensor": "binary_sensor.zaino"}
         flow = self.new(people=[person], options={})
         selection = await flow.async_step_bag_person()
-        self.assertEqual(selection["schema"]["person"], {"giulia": "Giulia"})
-        await flow.async_step_bag_person({"person": "giulia"})
+        self.assertEqual(selection["schema"]["person"], {"member": "Member"})
+        await flow.async_step_bag_person({"person": "member"})
         result = await flow.async_step_bag_policy({"bag_policy": "legacy"})
-        self.assertEqual(result["data"]["bag_policies"], {"giulia": "legacy"})
+        self.assertEqual(result["data"]["bag_policies"], {"member": "legacy"})
 
 
 if __name__ == "__main__":
