@@ -1,0 +1,58 @@
+{
+  "title": "Presenza famiglia",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Abitazione",
+        "description": "Seleziona i sensori comuni. Questa versione non modifica ancora gli stati.",
+        "data": {
+          "household_name": "Nome abitazione",
+          "gate_entities": "Sensori cancello (facoltativi)",
+          "door_contact": "Contatto porta (facoltativo)",
+          "door_lock": "Serratura (facoltativa)",
+          "alarm": "Allarme (facoltativo)"
+        }
+      },
+      "person": {
+        "title": "Componente della famiglia",
+        "description": "Seleziona almeno una fonte di presenza per persona.",
+        "data": {
+          "person_name": "Nome",
+          "iphone_tracker": "Tracker telefono (facoltativo)",
+          "watch_sensor": "Sensore BLE indossabile (facoltativo)",
+          "bag_sensor": "Sensore zaino (facoltativo)"
+        }
+      },
+      "another": {
+        "title": "Altri componenti?",
+        "data": {
+          "add_another": "Aggiungi un'altra persona"
+        }
+      }
+    },
+    "error": {
+      "invalid_name": "Inserisci un nome.",
+      "duplicate_name": "Nome già presente.",
+      "missing_sources": "Seleziona almeno una fonte di presenza."
+    },
+    "abort": {
+      "already_configured": "Abitazione già configurata."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Finestre temporali",
+        "description": "Secondi; i parametri non sono ancora applicati dal motore.",
+        "data": {
+          "exit_gate_seconds": "Uscita cancello",
+          "exit_door_seconds": "Uscita porta chiusa",
+          "exit_lock_seconds": "Uscita serratura",
+          "entry_gate_seconds": "Rientro cancello",
+          "entry_door_seconds": "Rientro apertura porta",
+          "entry_lock_seconds": "Rientro sblocco"
+        }
+      }
+    }
+  }
+}
