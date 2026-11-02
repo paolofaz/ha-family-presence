@@ -113,6 +113,23 @@ class SourceAdapterTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.gather(*self.hass.tasks, return_exceptions=False)
         self.hass.tasks.clear()
 
+    async def test_stable_person_identifier_is_independent_of_display_name(self):
+        config = {"people": [
+            {"person_name": "Giulia", "person_id": "stable-id-42",
+             "iphone_tracker": "phone", "watch_sensor": "watch",
+             "bag_sensor": "bag", "bag_policy": "always"}
+        ]}
+        first = self.mod._person_specs(config)
+        config["people"][0]["person_name"] = "New display name"
+        second = self.mod._person_specs(config)
+        self.assertEqual(first[0].key, "stable-id-42")
+        self.assertEqual(second[0].key, "stable-id-42")
+        self.assertNotEqual(first[0].name, second[0].name)
+
+    async def test_legacy_config_without_id_remains_compatible(self):
+        legacy = {"people": [{"person_name": "Child", "bag_sensor": "bag"}]}
+        self.assertEqual(self.mod._person_specs(legacy)[0].key, "child")
+
     async def test_subscribes_reference_and_all_mapped_sensors(self):
         entities, _callback = self.events.callbacks[-1]
         self.assertEqual(set(entities),

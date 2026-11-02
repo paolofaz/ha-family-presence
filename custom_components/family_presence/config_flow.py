@@ -4,6 +4,7 @@ Only records configuration in the foundation stage: no active FSM listeners.
 """
 from __future__ import annotations
 from typing import Any
+from uuid import uuid4
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
@@ -13,6 +14,7 @@ from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 from .const import (
     CONF_ADD_ANOTHER, CONF_ALARM, CONF_BAG, CONF_BAG_POLICY, CONF_DOOR, CONF_GATE_ENTITIES,
     CONF_HOUSEHOLD_NAME, CONF_IPHONE, CONF_LOCK, CONF_PEOPLE, CONF_PERSON_NAME,
+    CONF_PERSON_ID,
     CONF_REFERENCE,
     CONF_WATCH, DEFAULT_WINDOWS, DOMAIN,
 )
@@ -72,7 +74,11 @@ class FamilyPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             elif not any(user_input.get(k) for k in (CONF_IPHONE, CONF_WATCH, CONF_BAG)):
                 errors["base"] = "missing_sources"
             else:
-                self._people.append({**user_input, CONF_PERSON_NAME: name})
+                self._people.append({
+                    **user_input,
+                    CONF_PERSON_NAME: name,
+                    CONF_PERSON_ID: uuid4().hex,
+                })
                 return await self.async_step_another()
         return self.async_show_form(step_id="person", data_schema=PERSON_SCHEMA, errors=errors)
 

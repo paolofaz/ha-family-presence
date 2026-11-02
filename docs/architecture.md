@@ -34,7 +34,7 @@ Family Presence consumes **standard Home Assistant entities** produced by indepe
 
 ## Configuration and diagnostics
 
-One household configuration entry, an arbitrary number of people, optional per-person reference `input_select`, phone/watch/bag entities, bag priority and household physical sources. Time windows live in options and follow the legacy defaults.
+One household configuration entry, an arbitrary number of people, optional per-person reference `input_select`, phone/watch/bag entities, bag priority and household physical sources. Each newly created person receives an immutable random `person_id`, used for shadow runtime/entity identity independently of their editable display name. Entries created by older scaffolds fall back to the casefolded name until migrated. Time windows live in options and follow the legacy defaults.
 
 The read-only shadow state is initialized from a valid reference helper **once** at setup and never written back. If it is missing, a saved state is optionally restored only when its source mapping fingerprint matches the current configuration. A restored state is marked `restored_from_storage` and cannot be treated as authoritative for alarms. If neither exists, state remains unknown. No historical physical evidence survives a reboot. Every decision logs the reason and current reference helper; `[shadow][blocked]` logs bag-vetoed entry hypotheses. Shadow source changes also refresh reference/quality attributes.
 
@@ -48,7 +48,7 @@ The in-memory `all_away()` returns unknown if any member is uninitialized. **The
 
 - Source-event ordering has initial per-person serialization and revision checks, but needs HA integration tests for rapid races, setup/teardown, source restores and concurrency.
 - Measure false bag OFF rates under the upstream 180s timeout and define an explicit, auditable manual override for a child returning without their bag, before live alarm migration.
-- Production-ready persistence, stable person IDs, editable source mappings and fully translated diagnostic entities. The current shadow snapshot is scoped to unchanged source mapping and uses the HA Store helper; it is not a production persistence guarantee.
+- Production-ready persistence, migration of legacy name-based IDs, editable source mappings and fully translated diagnostic entities. The current shadow snapshot is scoped to unchanged source mapping and uses the HA Store helper; it is not a production persistence guarantee.
 - Build actual time-aligned parity comparisons with the original YAML. A snapshot in the log is not proof of parity.
 - Add a conservative all-away binary sensor **only after** reboot/unavailable behavior has been reviewed. The all-away output must not arm the alarm on uncertain states.
 - Test first in shadow mode against the existing package, then migrate selected outputs and finally independent YAML automations, deliberately and reversibly.

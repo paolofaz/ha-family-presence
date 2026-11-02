@@ -6,7 +6,7 @@ A configurable, multi-person Home Assistant presence FSM using phone zone tracki
 
 ## Core behavior
 
-- Per-person state `home` / `near_home` / `away`, with no fixed family size.
+- Per-person state `home` / `near_home` / `away`, with no fixed family size. New people receive immutable internal IDs independent of display names (old name-based entries remain compatible).
 - Each person can map a phone tracker, Watch BLE sensor, optional bag sensor, a **legacy `input_select` reference** (for shadow comparison), and a bag priority policy.
 - Shared gate switches/sensors, door contact, door lock and alarm are selectable.
 - Event windows default to legacy values: Watch OFF: gate 120s, door/lock 90s relative to Watch `last_seen_before_off`; Watch ON: gate/door/unlock 120s, evaluated **after two seconds**.

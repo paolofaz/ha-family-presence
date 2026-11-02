@@ -16,7 +16,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_ALARM, CONF_BAG, CONF_BAG_POLICY, CONF_DOOR, CONF_GATE_ENTITIES,
-    CONF_IPHONE, CONF_LOCK, CONF_PEOPLE, CONF_PERSON_NAME, CONF_REFERENCE,
+    CONF_IPHONE, CONF_LOCK, CONF_PEOPLE, CONF_PERSON_NAME, CONF_PERSON_ID, CONF_REFERENCE,
     CONF_WATCH,
 )
 from .coordinator import PersonSources, ShadowBlocked, ShadowCoordinator, ShadowDecision, Windows
@@ -42,7 +42,7 @@ def _last_seen(value: Any) -> datetime | None:
 def _person_specs(config: dict[str, Any]) -> list[PersonSources]:
     return [
         PersonSources(
-            key=p[CONF_PERSON_NAME].strip().casefold(),
+            key=p.get(CONF_PERSON_ID) or p[CONF_PERSON_NAME].strip().casefold(),
             name=p[CONF_PERSON_NAME],
             iphone=p.get(CONF_IPHONE),
             watch=p.get(CONF_WATCH),
