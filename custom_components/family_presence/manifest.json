@@ -7,7 +7,7 @@
   "config_flow": false,
   "dependencies": [],
   "documentation": "https://github.com/paolofaz/ha-family-presence",
-  "integration_type": "helper",
+  "integration_type": "hub",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/paolofaz/ha-family-presence/issues",
   "requirements": [],
