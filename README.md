@@ -1,41 +1,53 @@
 # Family Presence for Home Assistant
 
-Multi-person presence detection for Home Assistant based on a finite state machine (FSM) and multiple evidence sources: phone zone tracking, BLE wearable presence, entrance events and optional bag sensors.
+A configurable, multi-person Home Assistant presence FSM using phone zone tracking, BLE wearables, physical gate/door/lock events, and optional bag sensors.
 
-> **Development foundation (0.1.0a1) — not ready to replace your existing automations.** The configuration UI records source mappings and time windows, and a pure-Python FSM is covered by regression tests. Home Assistant event listeners, state entities, alarm effects and persistent state are **not yet connected**. No working home presence or alarm YAML should be disabled at this stage.
+> **Experimental shadow build (0.1.0a1): DO NOT REPLACE YOUR EXISTING YAML.** The integration now subscribes to HA inputs and computes **in-memory shadow decisions only**. It does **not** register production sensor entities, modify legacy `input_select` values, persist its internal FSM, or control alarm/locks/heating. It has not yet been end-to-end tested inside a running Home Assistant instance.
 
-## Design goals
+## Core behavior
 
-- Preserve the three existing states: home, near_home, away.
-- One independent FSM per member and one household all-away result.
-- Parameterize member count, BLE/phone/bag source entities and shared gate/door/lock/alarm sources.
-- Preserve legacy rules except for explicitly reviewed configurable bag absence priority.
-- Isolate event-to-decision logic from Home Assistant adapters and persistence.
-- Keep downstream automation actions (alarm, lights, notifications) in YAML.
-- Validate new results in shadow mode against the running YAML implementation before migration.
+- Per-person state `home` / `near_home` / `away`, with no fixed family size.
+- Each person can map a phone tracker, Watch BLE sensor, optional bag sensor, a **legacy `input_select` reference** (for shadow comparison), and a bag priority policy.
+- Shared gate switches/sensors, door contact, door lock and alarm are selectable.
+- Event windows default to legacy values: Watch OFF: gate 120s, door/lock 90s relative to Watch `last_seen_before_off`; Watch ON: gate/door/unlock 120s, evaluated **after two seconds**.
+- Bag policy `always`: a **currently OFF** bag forces `away` regardless of iPhone/Watch/door/gate. **OFF → ON** is a `home` event. With bag already ON, other sensors govern the FSM normally: bag presence does **not** permanently lock `home`.
+- Bag policy `legacy`: the earlier behavior, with bag OFF causing departure only during the weekday 07:00–09:10 window; no precedence veto.
+- `unknown` / `unavailable` is not OFF. Startup recovery does not invent arrival/departure transitions.
+- `all_away()` is calculated internally, returning unknown if any person's state is unknown; there is intentionally **no live all-away entity yet**.
 
-## Repository layout
+## Shadow setup (for safe testing)
 
-- custom_components/family_presence/: HACS-standard integration directory (manifest, config flow, FSM, translations).
-- docs/baseline.md: baseline rules extracted from current YAML.
-- docs/architecture.md: interfaces, migration boundaries and roadmap.
-- docs/bag-policy.md: persistent bag-absence priority, hazards and regression scenarios.
-- tests/: self-contained unit tests for the pure FSM.
-- hacs.json: HACS repository metadata.
-- .github/workflows/validate.yml: unit tests, HACS validation and hassfest.
+1. Leave the original YAML package and all alarm/heating automations enabled.
+2. Install the contents of `custom_components/family_presence/` under your HA `config/custom_components/family_presence/`. **This branch is experimental, not a release.**
+3. Restart Home Assistant and add **Family Presence** under Settings → Devices & Services. Map the physical inputs and people.
+4. For each existing person, select the corresponding `input_select.presenza_...` helper as **Legacy YAML presence helper**. It seeds the shadow FSM once on startup and is read for diagnostic comparisons; never written.
+5. To see decisions and blocked false arrivals, enable info logs:
 
-## Configuration status
+   ```yaml
+   logger:
+     default: warning
+     logs:
+       custom_components.family_presence: info
+   ```
 
-The UI wizard allows one household, optional shared entrance entities and as many people as needed. Each person can select a phone tracker, a BLE wearable sensor and/or a bag sensor. Defaults for correlation windows preserve the legacy package: exit gate 120s, door close 90s, lock 90s; entry gate/door open/unlock 120s. The proposed **always** bag policy (default for a configured bag) forces away whenever its sensor is validly OFF, at any time, and overrides phone/Watch/shared entrance evidence. **legacy** mode retains the original school-morning departure rule and allows other signals to override it. Policies are configured per person; they are not active in Home Assistant until the runtime is implemented.
+6. Review log entries `[shadow]` and `[shadow][blocked]`. They are **observations**, not state changes. No alarm automations should be switched over to this integration.
 
-**These UI options are saved but do not drive presence yet.** Member mappings cannot yet be edited through Options; that will be completed before a production release.
+Without a legacy helper, a shadow person may begin **unknown** until a decisive event is observed. On every restart, shadow state is re-seeded from the legacy helper if mapped, then the current bag OFF constraint is reconciled. Internal event history is intentionally reset at restart.
 
-## Development checks
+**Limitations:** log lines include an instantaneous legacy-state snapshot, not a synchronized/eventually-consistent parity report. HA event-adapter behavior and reconfiguration are not yet fully tested in Home Assistant. Entity edits currently require rebuilding the config entry. Bag debounce, persistent state, manual override, diagnostics entities, and all-away sensor are not implemented.
 
-Run: python -m unittest discover -s tests -v
+## Files
 
-This repository is structured as a future HACS custom integration. Passing HACS checks and being listed in the HACS default catalog are separate milestones; branding, runtime behavior and release testing remain to be completed.
+- `custom_components/family_presence/fsm.py`: pure transition rules.
+- `custom_components/family_presence/coordinator.py`: per-person serialized shadow decisions, timestamp evidence, revision control.
+- `custom_components/family_presence/sources.py`: HA source subscriptions and normalization.
+- `custom_components/family_presence/config_flow.py`: household/person mapping and options.
+- `docs/baseline.md`: original YAML behavior.
+- `docs/bag-policy.md`: bag precedence design and safety risks.
+- `docs/architecture.md`: architecture, transition semantics and migration roadmap.
+- `tests/`: pure unit tests; run `python -m unittest discover -s tests -v`.
+- `.github/workflows/validate.yml`: unit tests, hassfest and HACS validation.
 
-The working legacy YAML package is intentionally not included in this public repository, to avoid publishing household-specific names and entity IDs.
+The private household-specific YAML is intentionally **not included** in this public repository. License: MIT.
 
-License: MIT.
+HACS packaging layout is prepared, but a passing HACS validation, approved branding, and an actual release are still future work.

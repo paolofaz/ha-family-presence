@@ -1,61 +1,48 @@
-# Runtime architecture — target design
+# Family Presence architecture: shadow phase
 
-This repository currently stores a config entry and pure rules only. There are **no active presence listeners, state entities, persistent runtime state or alarm side effects** in the scaffold. Do not remove the original working YAML yet.
-
-## Layers
+## Installed modules
 
 ```text
-Shared inputs: gate / door / lock / alarm
-Person inputs: phone / Watch BLE / optional bag
-                |
-            sources.py                (planned)
-      normalize events and quality
-                |
-       correlator / coordinator.py     (planned)
-     timestamp windows + 2s Watch delay
-     current evidence snapshot per person
-                |
-              fsm.py                  (pure, implemented)
-        bag guard -> state transition
-                |
-           storage.py                 (planned)
-    single writer + restart restoration
-                |
-      sensor.py / binary_sensor.py     (planned)
- raw FSM state, reason, timestamps,
-         household all-away
-                |
-        downstream YAML automations
-      alarm / heating / notifications
+Home Assistant (configured person + shared sensors)
+     ↓
+sources.py (valid state-change events only; physical-event timestamps)
+     ↓
+coordinator.py (per-person async lock; 2s Watch ON delay; current evidence)
+     ↓
+fsm.py (pure decision rules; confirmed absent bag always wins)
+     ↓
+in-memory shadow state + logs only (NO production entity writes)
 ```
 
-## Transition contract
+Independent YAML automations continue controlling alarm, heating, warnings and notifications.
 
-Each member has a separate FSM (`home`, `near_home`, `away`). Phone exits/arrivals, Watch OFF/ON, gate/door/lock corroboration and bag changes match [baseline.md](baseline.md), except selected strict bag precedence in [bag-policy.md](bag-policy.md).
+## Source and transition contracts
 
-Watch OFF exit evidence is correlated with `last_seen_before_off` (gate <=120 seconds; door/lock <=90 seconds). Watch ON uses a 2-second delay and gate, opening and unlock evidence from <=120 seconds before evaluation. The engine must evaluate evidence at commit time, not cache it before sleeping.
+- Phone leaving `home` → `away`, phone returning `home` → `home`; invalid transitions are ignored.
+- Watch ON is evaluated after a 2-second delay, and **discarded if Watch has since turned off or another phone/Watch/bag event has superseded it**. Watch ON while `away` enters `home` with gate/door/unlock corroboration in 120s, otherwise `near_home`.
+- Watch OFF while `home` requires phone outside, gate/door closure/lock evidence relative to `last_seen_before_off`, or alarm armed away. Exit windows: gate 120s; door close and lock 90s.
+- While `near_home`, physical gate/door opening/unlock + Watch ON confirms `home`.
+- Bag OFF (strict mode) is a persistent veto: `away`, independent of time and competing sources. **A bag currently ON only removes the veto; its transition from OFF to ON sets `home`.** Legacy bag mode retains weekday 07:00–09:10 departure and no veto.
+- A shared gate event **never identifies** which person used it; it only corroborates another person's sensor.
+- Bag `unknown`/`unavailable` is not equivalent to OFF. Invalid/restore-only state changes are ignored; a recovering bag already OFF may trigger an absence reconciliation.
+- Physical history is *not* reloaded on restarts; stored old gate evidence must never imply a new entry.
 
-Shared gate events alone never identify a specific household member. Physical gate/door/lock evidence can only corroborate a person-specific source. When a bag is confirmed absent under `always`, that constraint beats *all* entry hypotheses.
+## Configuration and diagnostics
 
-## Configuration
+One household configuration entry, an arbitrary number of people, optional per-person reference `input_select`, phone/watch/bag entities, bag priority and household physical sources. Time windows live in options and follow the legacy defaults.
 
-One household config entry. People are not hard-coded; each member has a stable internal identifier, display name, optional phone tracker, optional BLE watch, optional bag sensor and bag priority `always` or `legacy`. Shared sensors and timing windows are household-level. The initial UI currently stores people, sources, policy and correlation windows; mapping edits and runtime consumers remain to be implemented.
+The read-only shadow state is initialized from the reference helper **once** at setup and is never written back. If no helper is mapped and no decisive input arrives, state remains unknown. Every shadow decision logs its reason and the *current* reference-helper state. `[shadow][blocked]` logs entry hypotheses vetoed by absent bag.
 
-Future scheduled bag policy may expose days, school time ranges and holidays. It is deliberately not active until specified and tested.
+The in-memory `all_away()` returns unknown if any member is uninitialized. **There is no all-away binary sensor or HA presence entity yet.** Users must not migrate any YAML action to the new shadow engine.
 
-## State and diagnostics
+## Safety limitations and upcoming tasks
 
-Suggested stable entities: one `sensor` per person with raw state and attributes for last reason, state-change timestamp, last evidence and conflict status; one all-away `binary_sensor` reporting true only when every tracked member is confidently AWAY. Surface user-facing text in translations; never overload raw state with zone descriptions.
+- Source-event ordering has initial per-person serialization and revision checks, but needs HA integration tests for rapid races, setup/teardown, source restores and concurrency.
+- Confirm bag OFF stability/debouncing and define an explicit, auditable manual override for a child returning without their bag, before live alarm migration.
+- Build persistent internal state, stable person IDs, editable source mappings and fully translated diagnostic entities.
+- Build actual time-aligned parity comparisons with the original YAML. A snapshot in the log is not proof of parity.
+- Add a conservative all-away binary sensor **only after** reboot/unavailable behavior has been reviewed. The all-away output must not arm the alarm on uncertain states.
+- Test first in shadow mode against the existing package, then migrate selected outputs and finally independent YAML automations, deliberately and reversibly.
+- HACS topics, branding assets and release automation remain unfinished.
 
-Support manual override separately from sensor facts, with clear expiry and provenance. Persist the minimum required state and metadata across restarts; never replay an old gate event as new evidence. If source state is unknown, do not equate it to an absent person or bag. Event order is serialized per member to prevent a late BLE event overwriting a newer bag veto.
-
-## Migration plan
-
-1. Finish real-world bag sensor reliability and override behavior, then commit precise tests.
-2. Implement coordinator and event adapter in shadow mode; do not write replacement presence entities or trigger the alarm until parity is demonstrated.
-3. Add persistence and stable sensors, including conservative all-away and reasons.
-4. Compare all four original people and a user-configured extra person; simulate HA restart, delayed Watch ON, source unavailable, shared gate and bag conflict.
-5. Migrate downstream YAML to the new entities only after end-to-end verification.
-6. Complete config edits, docs, HACS validation, Home Assistant Brands and releases before considering publication.
-
-Alarm arming/disarming, heating reminder, unlocked-door warning and unrelated work-zone notifications remain in YAML. Family Presence must not call alarm, lock or heating services itself.
+`async_unload_entry` removes listeners and cancels pending Watch ON tasks. An HA event adapter is now present but still experimental, not production-validated.

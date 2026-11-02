@@ -1,36 +1,32 @@
-# Bag absence priority — design decision
+# Bag policy: priority is asymmetric
 
-## Observed YAML failure
+## Rules agreed for design
 
-Legacy bag OFF moves a child to AWAY on weekdays 07:00–09:10. A Watch left charging at home may come back ON. If a gate, door opening or unlock happened recently (including a condominium neighbor's gate event), the Watch can wrongly move that person back to HOME. The original rules do not recheck whether the bag is still away.
+1. **Bag currently OFF ⇒ AWAY** in strict (`always`) mode, irrespective of phone, Watch, gate or door. This is a continuing guard, not merely a one-time departure event.
+2. **Bag OFF → ON ⇒ HOME**: an actual, validated sensor transition confirms the arrival.
+3. **Bag already ON ⇒ no precedence**: phone/Watch and existing FSM can change the person to AWAY. Bag presence does not continually force HOME.
+4. **Bag UNKNOWN/UNAVAILABLE** must not be interpreted as OFF. A sensor recovering to OFF may re-apply the absence guard, but its recovery alone is not a new arrival.
+5. `legacy` mode remains available per person, retaining weekday morning bag departures and allowing phone/Watch to override.
 
-## Per-person policy
+## Why
 
-- `always` (proposed default where a bag exists): confirmed bag OFF is a continuous AWAY invariant. The bag absence is re-evaluated **before every event**, including iPhone arrival, Watch ON, physical entry and startup reconciliation. This does not expire at 09:10 and sets AWAY even if bag removal is outside the old departure window.
-- `legacy`: original YAML behavior, without bag veto; bag OFF moves AWAY only on weekdays 07:00–09:10 and bag ON moves HOME.
-- Bag ON releases the absence veto and retains the original bag-arrival => HOME behavior.
-- No configured bag: no precedence. `unknown`/`unavailable` MUST NOT be interpreted as OFF, and neither should itself produce arrival or departure events.
-- The 07:00–09:10 window applies only to the legacy departure rule, not to the selected `always` policy.
-- Additional scheduled policies may be added only after reviewing real scenarios; a school-hours window could reintroduce the false arrival after its cutoff.
+A Watch charging at home may turn ON during school hours. A neighbor opening a shared condominium gate shortly beforehand can then create a false HOME confirmation, even though the child's bag is still outside. The absent bag takes precedence over this indirect inference, at any time of day.
 
-**Safety trade-off:** a child can come home without their bag. Strict mode still reports AWAY; the resulting all-away state can influence an alarm YAML automation. An explicit auditable manual override with expiry, conflict diagnostics and sensor-off stability/debounce are required before activating strict mode for production. Do not silently grant priority back to Watch, phone or a shared gate.
+## Real trade-offs
 
-## Example regression matrix
+A child may return without their bag; strict mode can therefore say AWAY while the child really is home. False bag OFF readings can produce the same problem. **Do not connect this experimental logic to alarm automations until bag debounce, diagnostic conflicts and a safe manual override are defined and tested.**
 
-| Prior state | Incoming event | Bag state | Always policy | Legacy policy |
-| --- | --- | --- | --- | --- |
-| AWAY | Watch ON + recent shared gate | OFF | stays AWAY | HOME |
-| AWAY | iPhone enters home | OFF | stays AWAY | HOME |
-| NEAR_HOME | Door opens + Watch detected | OFF | AWAY | HOME |
-| HOME | Bag OFF at 11:00 | OFF | AWAY | unchanged |
-| AWAY | Bag ON | ON | HOME | HOME |
-| AWAY | Watch ON + gate | UNKNOWN | HOME | HOME |
-| HOME | Reconcile after restart | OFF | AWAY | unchanged |
+## Test matrix
 
-## Adapter requirements (not yet implemented)
+| Earlier FSM | Event | Current bag | Strict output |
+| --- | --- | --- | --- |
+| AWAY | Watch ON + neighbor gate | OFF | remains AWAY |
+| AWAY | iPhone enters home | OFF | remains AWAY |
+| HOME | Bag goes OFF at 11:00 | OFF | AWAY |
+| AWAY | Bag transitions OFF → ON | ON | HOME |
+| HOME | iPhone leaves while bag already ON | ON | AWAY |
+| HOME | Watch OFF with valid departure evidence, bag ON | ON | AWAY |
+| HOME | Bag becomes UNKNOWN | UNKNOWN | no automatic arrival or departure |
+| Unknown | Reconcile with stable bag OFF | OFF | AWAY |
 
-- Normalize current stable source state before calling the FSM; use a person-specific policy.
-- Recheck bag after the Watch ON 2-second evaluation delay and immediately before committing a transition. A stale delayed Watch ON must not win over a newer bag OFF.
-- Reject invalid/restore-only sensor events; real OFF must be confirmed, not a transient unavailable status.
-- Serialize person-level processing and expose last rejected/blocked transition with an explanation.
-- Compare outcomes against the existing YAML in shadow mode before switching any live alarm or home automations.
+The current coordinator evaluates the real bag state **after** any Watch ON delay and prevents a queued older Watch ON from overtaking a new bag/phone/Watch event. Live Home Assistant event-adapter integration tests and a manual-override design are still outstanding.

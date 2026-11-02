@@ -21,7 +21,8 @@
           "iphone_tracker": "Phone tracker (optional)",
           "watch_sensor": "BLE wearable sensor (optional)",
           "bag_sensor": "Bag sensor (optional)",
-          "bag_policy": "Bag absence priority (always / legacy)"
+          "bag_policy": "Bag absence priority (always / legacy)",
+          "legacy_presence_entity": "Legacy YAML presence helper (optional, shadow comparison only)"
         }
       },
       "another": {

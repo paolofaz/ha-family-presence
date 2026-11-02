@@ -1,9 +1,9 @@
-"""Home Assistant bootstrap: foundation phase, intentionally no active listeners.
+"""Read-only Family Presence shadow integration bootstrap.
 
-The original YAML automations MUST remain active until shadow-mode parity
-and migration have been verified. No alarm or presence state is written here.
+The legacy YAML is the ONLY production state writer at this stage.
 """
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -12,10 +12,19 @@ if TYPE_CHECKING:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Accept stored configuration without activating an incomplete FSM."""
+    """Track events in shadow memory only. Never change HA states or actuators."""
+    # Lazy HA-only imports let pure FSM unit tests run without Home Assistant.
+    from .sources import ShadowSourceAdapter, build_coordinator
+
+    engine = build_coordinator(hass, entry)
+    adapter = ShadowSourceAdapter(hass, entry.data, engine)
+    adapter.start()
+    entry.runtime_data = adapter
+    await engine.reconcile()
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload the entry."""
+    """Unsubscribe source listeners and cancel pending Watch evaluations."""
+    await entry.runtime_data.async_stop()
     return True
