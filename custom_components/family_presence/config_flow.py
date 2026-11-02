@@ -11,10 +11,11 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 
 from .const import (
-    CONF_ADD_ANOTHER, CONF_ALARM, CONF_BAG, CONF_DOOR, CONF_GATE_ENTITIES,
+    CONF_ADD_ANOTHER, CONF_ALARM, CONF_BAG, CONF_BAG_POLICY, CONF_DOOR, CONF_GATE_ENTITIES,
     CONF_HOUSEHOLD_NAME, CONF_IPHONE, CONF_LOCK, CONF_PEOPLE, CONF_PERSON_NAME,
     CONF_WATCH, DEFAULT_WINDOWS, DOMAIN,
 )
+from .fsm import BagPolicy
 
 
 def entity(domain: str) -> EntitySelector:
@@ -35,6 +36,9 @@ PERSON_SCHEMA = vol.Schema({
     vol.Optional(CONF_IPHONE): entity("device_tracker"),
     vol.Optional(CONF_WATCH): entity("binary_sensor"),
     vol.Optional(CONF_BAG): entity("binary_sensor"),
+    vol.Optional(CONF_BAG_POLICY, default=BagPolicy.ALWAYS.value): vol.In(
+        [BagPolicy.ALWAYS.value, BagPolicy.LEGACY.value]
+    ),
 })
 ANOTHER_SCHEMA = vol.Schema({vol.Required(CONF_ADD_ANOTHER, default=False): bool})
 

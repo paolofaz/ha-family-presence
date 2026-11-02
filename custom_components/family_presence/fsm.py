@@ -23,6 +23,21 @@ class Event(StrEnum):
     PHYSICAL_ENTRY = "physical_entry"
     BAG_ARRIVED = "bag_arrived"
     BAG_LEFT = "bag_left"
+    RECONCILE = "reconcile"
+
+
+class BagStatus(StrEnum):
+    """A temporarily unavailable sensor is not an absent bag."""
+    NOT_CONFIGURED = "not_configured"
+    PRESENT = "present"
+    ABSENT = "absent"
+    UNKNOWN = "unknown"
+
+
+class BagPolicy(StrEnum):
+    """Per-person precedence policy."""
+    ALWAYS = "always"
+    LEGACY = "legacy"
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +54,7 @@ class Evidence:
     watch_detected: bool = False
     physical_event_label: str = "physical event"
     school_bag_window: bool = False
+    bag_status: BagStatus = BagStatus.NOT_CONFIGURED
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,8 +64,26 @@ class Decision:
     reason: str
 
 
-def decide(current: State, event: Event, evidence: Evidence = Evidence()) -> Decision | None:
-    """Return one deterministic decision, or None when nothing should update."""
+def decide(
+    current: State,
+    event: Event,
+    evidence: Evidence = Evidence(),
+    *,
+    bag_policy: BagPolicy = BagPolicy.ALWAYS,
+) -> Decision | None:
+    """Decide atomically. Confirmed bag absence wins before every other rule.
+
+    ALWAYS: with the bag sensor currently OFF, force AWAY and suppress all
+    conflicting input events until the bag is ON again. The caller must
+    normalize OFF/ON/unknown/unavailable and serialize decisions per person.
+    LEGACY: original morning-only bag departure, with no persistent veto.
+    """
+    if bag_policy == BagPolicy.ALWAYS and evidence.bag_status == BagStatus.ABSENT:
+        return Decision(State.AWAY, "Bag absent (priority)") if current != State.AWAY else None
+
+    if event == Event.RECONCILE:
+        return None
+
     if event == Event.IPHONE_LEFT:
         return Decision(State.AWAY, "iPhone left home zone") if current != State.AWAY else None
     if event == Event.IPHONE_ARRIVED:
