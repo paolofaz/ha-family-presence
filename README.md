@@ -2,7 +2,7 @@
 
 A configurable, multi-person Home Assistant presence FSM using phone zone tracking, BLE wearables, physical gate/door/lock events, and optional bag sensors.
 
-> **Experimental shadow build (0.1.0a1): DO NOT REPLACE YOUR EXISTING YAML.** The integration subscribes to HA inputs, records *shadow-only* state snapshots and exposes **diagnostic shadow sensors**, never production presence entities. It does **not** modify existing `input_select` values, or control alarm/locks/heating. It has not yet been end-to-end tested inside a running Home Assistant instance.
+> **Experimental shadow build (0.1.0a2): DO NOT REPLACE YOUR EXISTING YAML.** The integration subscribes to HA inputs, records *shadow-only* state snapshots and exposes **diagnostic shadow sensors**, never production presence entities. It does **not** modify existing `input_select` values, or control alarm/locks/heating. It has not yet been end-to-end tested inside a running Home Assistant instance.
 
 ## Core behavior
 
@@ -58,6 +58,7 @@ Core FSM states, decision/event types, precedence between phone/Watch/physical i
 - `docs/ble-sources.md`: reviewed beacon/Watch providers, 180s timing contracts and why not to merge all three integrations.
 - `docs/architecture.md`: architecture, transition semantics and migration roadmap.
 - `docs/shadow-test-plan.md`: safe real-world installation and validation checklist.
+- `docs/alpha2-install.md`: Home Assistant helper-category fix and instructions for testing alpha 2.
 - `tests/`: pure unit tests; run `python -m unittest discover -s tests -v`.
 - `.github/workflows/validate.yml`: unit tests, hassfest and HACS validation.
 
