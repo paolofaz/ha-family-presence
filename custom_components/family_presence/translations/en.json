@@ -30,15 +30,74 @@
         "data": {
           "add_another": "Add another person"
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure household",
+        "menu_options": {
+          "reconfigure_shared": "Shared entrance sensors",
+          "reconfigure_choose": "Edit a household member",
+          "reconfigure_add": "Add a household member",
+          "reconfigure_remove": "Remove a household member"
+        }
+      },
+      "reconfigure_shared": {
+        "title": "Shared household sensors",
+        "description": "Edit common physical inputs without touching household members or YAML automations.",
+        "data": {
+          "household_name": "Household name",
+          "gate_entities": "Gate sensors (optional)",
+          "door_contact": "Door contact (optional)",
+          "door_lock": "Door lock (optional)",
+          "alarm": "Alarm (optional)"
+        }
+      },
+      "reconfigure_choose": {
+        "title": "Choose a member to edit",
+        "data": {
+          "person": "Household member"
+        }
+      },
+      "reconfigure_edit": {
+        "title": "Edit member's name and sensors",
+        "description": "BLE timeouts stay in source integrations. Change backpack priority separately with Configure.",
+        "data": {
+          "person_name": "Person name",
+          "iphone_tracker": "Phone tracker (optional)",
+          "watch_sensor": "BLE wearable sensor (optional)",
+          "bag_sensor": "Bag sensor (optional)",
+          "legacy_presence_entity": "Legacy YAML presence helper (optional, shadow comparison only)"
+        }
+      },
+      "reconfigure_add": {
+        "title": "Add a household member",
+        "description": "Select at least one input source. No live presence states will be changed.",
+        "data": {
+          "person_name": "Person name",
+          "iphone_tracker": "Phone tracker (optional)",
+          "watch_sensor": "BLE wearable sensor (optional)",
+          "bag_sensor": "Bag sensor (optional)",
+          "legacy_presence_entity": "Legacy YAML presence helper (optional, shadow comparison only)"
+        }
+      },
+      "reconfigure_remove": {
+        "title": "Remove a household member",
+        "description": "Only removes this person's shadow configuration.",
+        "data": {
+          "person": "Member to remove"
+        }
       }
     },
     "error": {
       "invalid_name": "Enter a name.",
       "duplicate_name": "This name is already used.",
-      "missing_sources": "Select at least one presence input."
+      "missing_sources": "Select at least one presence input.",
+      "duplicate_source": "This source entity belongs to another household member.",
+      "invalid_person": "Select a valid member."
     },
     "abort": {
-      "already_configured": "Household is already configured."
+      "already_configured": "Household is already configured.",
+      "person_not_found": "Household member not found.",
+      "last_member": "At least one household member must remain."
     }
   },
   "options": {

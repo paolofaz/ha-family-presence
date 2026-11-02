@@ -50,6 +50,33 @@ def load_flow():
         def async_abort(self, *, reason):
             return {"type": "abort", "reason": reason}
 
+    # Reuse the same fake UI methods for the ConfigFlow reconfigure steps.
+    for method in ("async_show_menu", "async_show_form", "async_create_entry", "async_abort"):
+        setattr(ConfigFlow, method, getattr(OptionsFlowWithReload, method))
+
+    def _get_reconfigure_entry(self):
+        return self._reconfigure_entry
+
+    async def async_set_unique_id(self, value):
+        self._unique_id = value
+
+    def _abort_if_unique_id_mismatch(self):
+        self._checked_unique_id = True
+
+    def async_update_reload_and_abort(self, entry, *, data_updates):
+        entry.data = {**entry.data, **data_updates}
+        return {"type": "abort", "reason": "reconfigure_successful",
+                "data": entry.data, "reloaded": True}
+
+    def add_suggested_values_to_schema(self, schema, data):
+        return schema
+
+    ConfigFlow._get_reconfigure_entry = _get_reconfigure_entry
+    ConfigFlow.async_set_unique_id = async_set_unique_id
+    ConfigFlow._abort_if_unique_id_mismatch = _abort_if_unique_id_mismatch
+    ConfigFlow.async_update_reload_and_abort = async_update_reload_and_abort
+    ConfigFlow.add_suggested_values_to_schema = add_suggested_values_to_schema
+
     entries.ConfigFlow = ConfigFlow
     entries.OptionsFlowWithReload = OptionsFlowWithReload
     ha.config_entries = entries

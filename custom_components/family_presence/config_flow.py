@@ -1,6 +1,6 @@
 """Config flow for one household with configurable input entities per person.
 
-Only records configuration in the foundation stage: no active FSM listeners.
+Configuration and reconfiguration only update the shadow integration until release.
 """
 from __future__ import annotations
 from typing import Any
@@ -46,6 +46,39 @@ PERSON_SCHEMA = vol.Schema({
         [BagPolicy.ALWAYS.value, BagPolicy.LEGACY.value]
     ),
 })
+# Source mapping belongs to Reconfigure, behavioral choices to Configure.
+PERSON_RECONFIGURE_SCHEMA = vol.Schema({
+    vol.Required(CONF_PERSON_NAME): str,
+    vol.Optional(CONF_IPHONE): entity("device_tracker"),
+    vol.Optional(CONF_WATCH): entity("binary_sensor"),
+    vol.Optional(CONF_BAG): entity("binary_sensor"),
+    vol.Optional(CONF_REFERENCE): entity("input_select"),
+})
+
+
+def _member_errors(
+    candidate: dict[str, Any], others: list[dict[str, Any]]
+) -> dict[str, str]:
+    """Validate one person's input without relying on Home Assistant state."""
+    name = str(candidate.get(CONF_PERSON_NAME, "")).strip()
+    if not name:
+        return {CONF_PERSON_NAME: "invalid_name"}
+    if any(p[CONF_PERSON_NAME].strip().casefold() == name.casefold() for p in others):
+        return {CONF_PERSON_NAME: "duplicate_name"}
+    sources = (CONF_IPHONE, CONF_WATCH, CONF_BAG)
+    if not any(candidate.get(field) for field in sources):
+        return {"base": "missing_sources"}
+    # Sharing person-specific sources would make two FSMs react as one person.
+    if any(
+        candidate.get(field) == p.get(field)
+        for p in others
+        for field in sources
+        if candidate.get(field)
+    ):
+        return {"base": "duplicate_source"}
+    return {}
+
+
 ANOTHER_SCHEMA = vol.Schema({vol.Required(CONF_ADD_ANOTHER, default=False): bool})
 
 
@@ -56,6 +89,7 @@ class FamilyPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._household: dict[str, Any] = {}
         self._people: list[dict[str, Any]] = []
+        self._edit_person_key: str | None = None
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         if user_input is not None:
@@ -69,13 +103,8 @@ class FamilyPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             name = user_input[CONF_PERSON_NAME].strip()
-            if not name:
-                errors[CONF_PERSON_NAME] = "invalid_name"
-            elif any(p[CONF_PERSON_NAME].casefold() == name.casefold() for p in self._people):
-                errors[CONF_PERSON_NAME] = "duplicate_name"
-            elif not any(user_input.get(k) for k in (CONF_IPHONE, CONF_WATCH, CONF_BAG)):
-                errors["base"] = "missing_sources"
-            else:
+            errors = _member_errors(user_input, self._people)
+            if not errors:
                 self._people.append({
                     **user_input,
                     CONF_PERSON_NAME: name,
@@ -93,6 +122,169 @@ class FamilyPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data={**self._household, CONF_PEOPLE: self._people},
             )
         return self.async_show_form(step_id="another", data_schema=ANOTHER_SCHEMA)
+
+    async def _finish_reconfigure(self, updates: dict[str, Any]) -> FlowResult:
+        """Keep the one existing config entry and reload only shadow runtime."""
+        await self.async_set_unique_id("household")
+        self._abort_if_unique_id_mismatch()
+        return self.async_update_reload_and_abort(
+            self._get_reconfigure_entry(), data_updates=updates
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Edit source mappings and members without deleting the config entry."""
+        members = self._get_reconfigure_entry().data[CONF_PEOPLE]
+        actions = ["reconfigure_shared", "reconfigure_choose", "reconfigure_add"]
+        if len(members) > 1:
+            actions.append("reconfigure_remove")
+        return self.async_show_menu(
+            step_id="reconfigure", menu_options=actions
+        )
+
+    async def async_step_reconfigure_shared(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Update shared physical sensor mappings, without touching people."""
+        entry = self._get_reconfigure_entry()
+        shared_fields = (CONF_HOUSEHOLD_NAME, CONF_GATE_ENTITIES, CONF_DOOR,
+                         CONF_LOCK, CONF_ALARM)
+        if user_input is not None:
+            title = user_input[CONF_HOUSEHOLD_NAME].strip()
+            if title:
+                # The HA reconfigure helper merges data_updates. Explicitly
+                # store None for cleared optional entities so old mappings
+                # cannot silently survive a user's removal.
+                new_shared = {key: user_input.get(key) for key in shared_fields}
+                new_shared[CONF_HOUSEHOLD_NAME] = title
+                return await self._finish_reconfigure(new_shared)
+            return self.async_show_form(
+                step_id="reconfigure_shared",
+                data_schema=self.add_suggested_values_to_schema(
+                    HOUSEHOLD_SCHEMA, entry.data
+                ),
+                errors={CONF_HOUSEHOLD_NAME: "invalid_name"},
+            )
+        return self.async_show_form(
+            step_id="reconfigure_shared",
+            data_schema=self.add_suggested_values_to_schema(
+                HOUSEHOLD_SCHEMA, entry.data
+            ),
+        )
+
+    async def async_step_reconfigure_choose(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Choose a member by stable internal ID, not by their display name."""
+        choices = {
+            _person_key(p): p[CONF_PERSON_NAME]
+            for p in self._get_reconfigure_entry().data[CONF_PEOPLE]
+        }
+        if user_input is not None:
+            selected = user_input["person"]
+            if selected in choices:
+                self._edit_person_key = selected
+                return await self.async_step_reconfigure_edit()
+            return self.async_show_form(
+                step_id="reconfigure_choose",
+                data_schema=vol.Schema({vol.Required("person"): vol.In(choices)}),
+                errors={"base": "invalid_person"},
+            )
+        return self.async_show_form(
+            step_id="reconfigure_choose",
+            data_schema=vol.Schema({vol.Required("person"): vol.In(choices)}),
+        )
+
+    async def async_step_reconfigure_edit(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Edit a member's sensors and name while preserving its identity."""
+        entry = self._get_reconfigure_entry()
+        original = next(
+            (p for p in entry.data[CONF_PEOPLE]
+             if _person_key(p) == self._edit_person_key), None
+        )
+        if original is None:
+            return self.async_abort(reason="person_not_found")
+        if user_input is not None:
+            others = [
+                p for p in entry.data[CONF_PEOPLE]
+                if _person_key(p) != self._edit_person_key
+            ]
+            errors = _member_errors(user_input, others)
+            if not errors:
+                updated = {
+                    **{k: v for k, v in user_input.items() if v},
+                    CONF_PERSON_NAME: user_input[CONF_PERSON_NAME].strip(),
+                    # Upgrade early name-derived keys without changing the key.
+                    CONF_PERSON_ID: _person_key(original),
+                    CONF_BAG_POLICY: original.get(
+                        CONF_BAG_POLICY, BagPolicy.ALWAYS.value
+                    ),
+                }
+                people = [
+                    updated if _person_key(p) == self._edit_person_key else p
+                    for p in entry.data[CONF_PEOPLE]
+                ]
+                return await self._finish_reconfigure({CONF_PEOPLE: people})
+        else:
+            errors = {}
+        return self.async_show_form(
+            step_id="reconfigure_edit",
+            data_schema=self.add_suggested_values_to_schema(
+                PERSON_RECONFIGURE_SCHEMA, original
+            ),
+            errors=errors,
+        )
+
+    async def async_step_reconfigure_add(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Add a member with a new stable identifier."""
+        entry = self._get_reconfigure_entry()
+        errors = {}
+        if user_input is not None:
+            errors = _member_errors(user_input, entry.data[CONF_PEOPLE])
+            if not errors:
+                member = {
+                    **{k: v for k, v in user_input.items() if v},
+                    CONF_PERSON_NAME: user_input[CONF_PERSON_NAME].strip(),
+                    CONF_PERSON_ID: uuid4().hex,
+                    CONF_BAG_POLICY: BagPolicy.ALWAYS.value,
+                }
+                return await self._finish_reconfigure({
+                    CONF_PEOPLE: [*entry.data[CONF_PEOPLE], member]
+                })
+        return self.async_show_form(
+            step_id="reconfigure_add",
+            data_schema=PERSON_RECONFIGURE_SCHEMA,
+            errors=errors,
+        )
+
+    async def async_step_reconfigure_remove(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Remove a member; never permit an empty household."""
+        entry = self._get_reconfigure_entry()
+        members = entry.data[CONF_PEOPLE]
+        if len(members) < 2:
+            return self.async_abort(reason="last_member")
+        choices = {_person_key(p): p[CONF_PERSON_NAME] for p in members}
+        if user_input is not None:
+            key = user_input["person"]
+            if key in choices:
+                return await self._finish_reconfigure({
+                    CONF_PEOPLE: [p for p in members if _person_key(p) != key]
+                })
+            errors = {"base": "invalid_person"}
+        else:
+            errors = {}
+        return self.async_show_form(
+            step_id="reconfigure_remove",
+            data_schema=vol.Schema({vol.Required("person"): vol.In(choices)}),
+            errors=errors,
+        )
 
     @staticmethod
     @callback

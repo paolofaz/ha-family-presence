@@ -30,15 +30,74 @@
         "data": {
           "add_another": "Aggiungi un'altra persona"
         }
+      },
+      "reconfigure": {
+        "title": "Riconfigura famiglia",
+        "menu_options": {
+          "reconfigure_shared": "Sensori condivisi",
+          "reconfigure_choose": "Modifica una persona",
+          "reconfigure_add": "Aggiungi una persona",
+          "reconfigure_remove": "Rimuovi una persona"
+        }
+      },
+      "reconfigure_shared": {
+        "title": "Sensori condivisi dell'abitazione",
+        "description": "Modifica i sensori fisici, senza cambiare le persone né le automazioni YAML.",
+        "data": {
+          "household_name": "Nome abitazione",
+          "gate_entities": "Sensori cancello (facoltativi)",
+          "door_contact": "Contatto porta (facoltativo)",
+          "door_lock": "Serratura (facoltativa)",
+          "alarm": "Allarme (facoltativo)"
+        }
+      },
+      "reconfigure_choose": {
+        "title": "Seleziona la persona da modificare",
+        "data": {
+          "person": "Persona"
+        }
+      },
+      "reconfigure_edit": {
+        "title": "Modifica nome e sensori della persona",
+        "description": "I sensori BLE mantengono i loro timeout nelle integrazioni di origine. La politica dello zaino si modifica con Configura.",
+        "data": {
+          "person_name": "Nome",
+          "iphone_tracker": "Tracker telefono (facoltativo)",
+          "watch_sensor": "Sensore BLE indossabile (facoltativo)",
+          "bag_sensor": "Sensore zaino (facoltativo)",
+          "legacy_presence_entity": "Stato FSM YAML attuale (facoltativo, solo confronto)"
+        }
+      },
+      "reconfigure_add": {
+        "title": "Aggiungi una persona",
+        "description": "Configura almeno una sorgente; non verranno modificati gli stati reali.",
+        "data": {
+          "person_name": "Nome",
+          "iphone_tracker": "Tracker telefono (facoltativo)",
+          "watch_sensor": "Sensore BLE indossabile (facoltativo)",
+          "bag_sensor": "Sensore zaino (facoltativo)",
+          "legacy_presence_entity": "Stato FSM YAML attuale (facoltativo, solo confronto)"
+        }
+      },
+      "reconfigure_remove": {
+        "title": "Rimuovi una persona",
+        "description": "Rimuove solo la configurazione shadow di questa persona.",
+        "data": {
+          "person": "Persona da rimuovere"
+        }
       }
     },
     "error": {
       "invalid_name": "Inserisci un nome.",
       "duplicate_name": "Nome già presente.",
-      "missing_sources": "Seleziona almeno una fonte di presenza."
+      "missing_sources": "Seleziona almeno una fonte di presenza.",
+      "duplicate_source": "Questa sorgente di presenza è già assegnata a un'altra persona.",
+      "invalid_person": "Seleziona una persona valida."
     },
     "abort": {
-      "already_configured": "Abitazione già configurata."
+      "already_configured": "Abitazione già configurata.",
+      "person_not_found": "Persona non trovata.",
+      "last_member": "Deve rimanere almeno una persona configurata."
     }
   },
   "options": {
