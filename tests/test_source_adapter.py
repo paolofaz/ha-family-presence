@@ -130,6 +130,37 @@ class SourceAdapterTests(unittest.IsolatedAsyncioTestCase):
         legacy = {"people": [{"person_name": "Child", "bag_sensor": "bag"}]}
         self.assertEqual(self.mod._person_specs(legacy)[0].key, "child")
 
+    async def test_bag_policy_options_override_initial_policy(self):
+        config = {"people": [
+            {"person_name": "Child", "person_id": "child-id",
+             "bag_sensor": "bag", "bag_policy": "always"}
+        ]}
+        defaults = self.mod._person_specs(config)
+        overrides = self.mod._person_specs(config, {
+            "bag_policies": {"child-id": "legacy"},
+        })
+        self.assertEqual(defaults[0].bag_policy, BagPolicy.ALWAYS)
+        self.assertEqual(overrides[0].bag_policy, BagPolicy.LEGACY)
+        self.assertEqual(config["people"][0]["bag_policy"], "always")
+
+    async def test_bag_policy_options_for_other_person_do_not_leak(self):
+        config = {"people": [
+            {"person_name": "Child", "person_id": "child-id", "bag_sensor": "bag"},
+            {"person_name": "Other", "person_id": "other-id", "bag_sensor": "bag2"},
+        ]}
+        specs = self.mod._person_specs(config, {"bag_policies": {
+            "child-id": "legacy",
+        }})
+        self.assertEqual([p.bag_policy for p in specs],
+                         [BagPolicy.LEGACY, BagPolicy.ALWAYS])
+
+    async def test_legacy_name_based_policy_option_is_supported(self):
+        config = {"people": [{"person_name": "Giulia", "bag_sensor": "bag"}]}
+        specs = self.mod._person_specs(config, {
+            "bag_policies": {"giulia": "legacy"},
+        })
+        self.assertEqual(specs[0].bag_policy, BagPolicy.LEGACY)
+
     async def test_subscribes_reference_and_all_mapped_sensors(self):
         entities, _callback = self.events.callbacks[-1]
         self.assertEqual(set(entities),

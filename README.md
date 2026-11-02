@@ -10,7 +10,7 @@ A configurable, multi-person Home Assistant presence FSM using phone zone tracki
 - Each person can map a phone tracker, Watch BLE sensor, optional bag sensor, a **legacy `input_select` reference** (for shadow comparison), and a bag priority policy.
 - Shared gate switches/sensors, door contact, door lock and alarm are selectable.
 - Event windows default to legacy values: Watch OFF: gate 120s, door/lock 90s relative to Watch `last_seen_before_off`; Watch ON: gate/door/unlock 120s, evaluated **after two seconds**.
-- Bag policy `always`: a **currently OFF** bag forces `away` regardless of iPhone/Watch/door/gate. **OFF → ON** is a `home` event. With bag already ON, other sensors govern the FSM normally: bag presence does **not** permanently lock `home`.
+- Bag policy `always` (the recommended default for a configured bag): a **currently OFF** bag forces `away` regardless of iPhone/Watch/door/gate. **OFF → ON** is a `home` event. With bag already ON, other sensors govern the FSM normally: bag presence does **not** permanently lock `home`.
 - Bag policy `legacy`: the earlier behavior, with bag OFF causing departure only during the weekday 07:00–09:10 window; no precedence veto.
 - `unknown` / `unavailable` is not OFF. Startup recovery does not invent arrival/departure transitions.
 - `all_away()` is calculated internally, returning unknown if any person's state is unknown; **no all-away entity** is exposed and no shadow sensor should be used to arm/disarm alarms.
@@ -35,7 +35,15 @@ A configurable, multi-person Home Assistant presence FSM using phone zone tracki
 
 On restart, the integration prefers a **currently valid YAML helper state**. If the helper is missing/unknown, a compatible saved shadow snapshot may be restored and is explicitly flagged `restored_from_storage`. A snapshot is accepted only for the **same per-person source mapping and bag policy**. If neither helper nor snapshot is available, state remains unknown until a decisive event. Only state/reason/last-change metadata are stored; **BLE event, gate and door timestamps are intentionally cleared at restart** to avoid accidental reused evidence. A valid bag OFF constraint is reconciled on startup.
 
-**Limitations:** log lines and diagnostic sensor comparisons include instantaneous legacy-state snapshots, not a synchronized parity report. HA event-adapter and new diagnostic sensor platform need real-world integration testing. Entity edits currently require rebuilding the config entry. Additional bag debounce, manual override, full production presence entities and all-away output are **not implemented**. Persisted shadow states are diagnostic-only and can be stale.
+## Configuration policy: limited flexibility
+
+Under **Settings → Devices & Services → Family Presence → Configure**:
+- **Event correlation windows:** adjust the six gate/door/lock evidence windows. Values remain seconds, with the original YAML defaults.
+- **Backpack priority:** choose a member with a configured bag, then select `always` (strict absence priority) or `legacy` (original YAML morning-only bag departure). Overrides live in the entry's options and automatically reload the **shadow** integration without deleting the entry.
+
+Core FSM states, decision/event types, precedence between phone/Watch/physical inputs, and the two-second Watch observation delay remain in code, not user-defined expressions. The upstream Beacon BLE and Watch BLE absence timeouts are adjusted **only** in their respective integrations. Adding/removing members or remapping input entities is still planned as a separate reconfiguration flow.
+
+**Limitations:** log lines and diagnostic sensor comparisons include instantaneous legacy-state snapshots, not a synchronized parity report. HA event-adapter and new diagnostic sensor platform need real-world integration testing. Member/source entity edits still require rebuilding the config entry; timing windows and backpack policies can now be edited through Configure. Additional bag debounce, manual override, full production presence entities and all-away output are **not implemented**. Persisted shadow states are diagnostic-only and can be stale.
 
 ## Files
 

@@ -34,7 +34,7 @@ Family Presence consumes **standard Home Assistant entities** produced by indepe
 
 ## Configuration and diagnostics
 
-One household configuration entry, an arbitrary number of people, optional per-person reference `input_select`, phone/watch/bag entities, bag priority and household physical sources. Each newly created person receives an immutable random `person_id`, used for shadow runtime/entity identity independently of their editable display name. Entries created by older scaffolds fall back to the casefolded name until migrated. Time windows live in options and follow the legacy defaults.
+One household configuration entry, an arbitrary number of people, optional per-person reference `input_select`, phone/watch/bag entities, bag priority and household physical sources. Each newly created person receives an immutable random `person_id`, used for shadow runtime/entity identity independently of their editable display name. Entries created by older scaffolds fall back to the casefolded name until migrated. Time windows live in options and follow the legacy defaults. A per-person `bag_policies` override map in options uses the stable `person_id` (legacy entries use casefolded names). The effective `bag_policy` is resolved on each config-entry reload, without changing the original person data.
 
 The read-only shadow state is initialized from a valid reference helper **once** at setup and never written back. If it is missing, a saved state is optionally restored only when its source mapping fingerprint matches the current configuration. A restored state is marked `restored_from_storage` and cannot be treated as authoritative for alarms. If neither exists, state remains unknown. No historical physical evidence survives a reboot. Every decision logs the reason and current reference helper; `[shadow][blocked]` logs bag-vetoed entry hypotheses. Shadow source changes also refresh reference/quality attributes.
 
@@ -43,6 +43,12 @@ The in-memory `all_away()` returns unknown if any member is uninitialized. **The
 ## Provisional near-home state
 
 `near_home` represents a pending Watch-based arrival without sufficient physical corroboration, not confirmed occupancy. The engine now measures the duration of observed provisional states; it **never expires them automatically**. The current all-away semantics remain conservative: one near-home member blocks `all_away=true`, while only `home` can trigger the independent return-alarm action. See [near-home.md](near-home.md).
+
+## Configuration boundary
+
+The **Options** menu provides only two actions: edit the six physical-event correlation windows, or select a person with a configured bag and edit their `always`/`legacy` priority policy. OptionsFlowWithReload restarts the **shadow** runtime to apply the new settings. It preserves other options and the stable per-person IDs. Mappings/add/remove people are separate future reconfiguration operations; BLE scan/presence timeouts remain with their BLE source integrations.
+
+No arbitrary YAML/Jinja/Python conditions or generic rule editor will be supported. State transitions and invariant enforcement are tested Python behavior, not per-user scripts. See [configuration-policy.md](configuration-policy.md).
 
 ## Safety limitations and upcoming tasks
 

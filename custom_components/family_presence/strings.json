@@ -44,17 +44,45 @@
   "options": {
     "step": {
       "init": {
+        "title": "Family Presence settings",
+        "menu_options": {
+          "windows": "Event correlation windows",
+          "bag_person": "Backpack priority policies"
+        }
+      },
+      "windows": {
         "title": "Event correlation windows",
-        "description": "Seconds; stored but not used until runtime is implemented.",
+        "description": "Seconds used by the FSM. Bluetooth detection timeouts belong to the separate BLE integrations.",
         "data": {
-          "exit_gate_seconds": "Departure gate",
-          "exit_door_seconds": "Departure door close",
-          "exit_lock_seconds": "Departure lock",
-          "entry_gate_seconds": "Arrival gate",
-          "entry_door_seconds": "Arrival door opening",
-          "entry_lock_seconds": "Arrival unlock"
+          "exit_gate_seconds": "Departure: gate",
+          "exit_door_seconds": "Departure: door closing",
+          "exit_lock_seconds": "Departure: lock",
+          "entry_gate_seconds": "Arrival: gate",
+          "entry_door_seconds": "Arrival: door opening",
+          "entry_lock_seconds": "Arrival: unlocking"
+        }
+      },
+      "bag_person": {
+        "title": "Choose a person",
+        "description": "Select the household member whose backpack rule you want to change.",
+        "data": {
+          "person": "Household member"
+        }
+      },
+      "bag_policy": {
+        "title": "Backpack precedence",
+        "description": "Choose bag precedence for {person}. always: confirmed bag absence wins; legacy: original YAML behavior. A present bag never locks the person at home.",
+        "data": {
+          "bag_policy": "Backpack policy"
         }
       }
+    },
+    "error": {
+      "invalid_person": "Person not available.",
+      "invalid_policy": "Invalid backpack policy."
+    },
+    "abort": {
+      "person_not_found": "The person is no longer available or has no configured backpack."
     }
   }
 }

@@ -15,7 +15,8 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util import dt as dt_util
 
 from .const import (
-    CONF_ALARM, CONF_BAG, CONF_BAG_POLICY, CONF_DOOR, CONF_GATE_ENTITIES,
+    CONF_ALARM, CONF_BAG, CONF_BAG_POLICY, CONF_BAG_POLICIES,
+    CONF_DOOR, CONF_GATE_ENTITIES,
     CONF_IPHONE, CONF_LOCK, CONF_PEOPLE, CONF_PERSON_NAME, CONF_PERSON_ID, CONF_REFERENCE,
     CONF_WATCH,
 )
@@ -39,7 +40,10 @@ def _last_seen(value: Any) -> datetime | None:
     return dt.astimezone(timezone.utc)
 
 
-def _person_specs(config: dict[str, Any]) -> list[PersonSources]:
+def _person_specs(
+    config: dict[str, Any], options: dict[str, Any] | None = None
+) -> list[PersonSources]:
+    policies = (options or {}).get(CONF_BAG_POLICIES, {})
     return [
         PersonSources(
             key=p.get(CONF_PERSON_ID) or p[CONF_PERSON_NAME].strip().casefold(),
@@ -48,7 +52,10 @@ def _person_specs(config: dict[str, Any]) -> list[PersonSources]:
             watch=p.get(CONF_WATCH),
             bag=p.get(CONF_BAG),
             reference=p.get(CONF_REFERENCE),
-            bag_policy=BagPolicy(p.get(CONF_BAG_POLICY, BagPolicy.ALWAYS.value)),
+            bag_policy=BagPolicy(policies.get(
+                p.get(CONF_PERSON_ID) or p[CONF_PERSON_NAME].strip().casefold(),
+                p.get(CONF_BAG_POLICY, BagPolicy.ALWAYS.value),
+            )),
         )
         for p in config[CONF_PEOPLE]
     ]
@@ -89,7 +96,7 @@ def build_coordinator(hass: HomeAssistant, entry: Any) -> ShadowCoordinator:
         )
 
     return ShadowCoordinator(
-        _person_specs(config),
+        _person_specs(config, options),
         read_state=read_state,
         windows=Windows(**window_data),
         alarm=config.get(CONF_ALARM),
