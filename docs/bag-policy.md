@@ -8,13 +8,17 @@
 4. **Bag UNKNOWN/UNAVAILABLE** must not be interpreted as OFF. A sensor recovering to OFF may re-apply the absence guard, but its recovery alone is not a new arrival.
 5. `legacy` mode remains available per person, retaining weekday morning bag departures and allowing phone/Watch to override.
 
+## Interaction with the BLE provider
+
+The actual backpack provider, `beacon_ble_presence`, already waits **180 seconds since the last valid advertisement** before declaring OFF (checked periodically). There is **no extra mandatory absence debounce** in Family Presence by design. A second timer could double departure latency. However, a physically absent backpack may report ON during that initial 180-second window, when the strict veto cannot apply. See [ble-sources.md](ble-sources.md) for full source review and limitations.
+
 ## Why
 
 A Watch charging at home may turn ON during school hours. A neighbor opening a shared condominium gate shortly beforehand can then create a false HOME confirmation, even though the child's bag is still outside. The absent bag takes precedence over this indirect inference, at any time of day.
 
 ## Real trade-offs
 
-A child may return without their bag; strict mode can therefore say AWAY while the child really is home. False bag OFF readings can produce the same problem. **Do not connect this experimental logic to alarm automations until bag debounce, diagnostic conflicts and a safe manual override are defined and tested.**
+A child may return without their bag; strict mode can therefore say AWAY while the child really is home. False bag OFF readings can produce the same problem. **Do not connect this experimental logic to alarm automations until provider reliability, diagnostic conflicts and a safe manual override are validated.**
 
 ## Test matrix
 

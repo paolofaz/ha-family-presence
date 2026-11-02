@@ -45,6 +45,7 @@ Without a legacy helper, a shadow person may begin **unknown** until a decisive 
 - `docs/baseline.md`: original YAML behavior.
 - `docs/bag-policy.md`: bag precedence design and safety risks.
 - `docs/near-home.md`: rationale for preserving provisional near_home, alarm implications, and shadow diagnostics.
+- `docs/ble-sources.md`: reviewed beacon/Watch providers, 180s timing contracts and why not to merge all three integrations.
 - `docs/architecture.md`: architecture, transition semantics and migration roadmap.
 - `tests/`: pure unit tests; run `python -m unittest discover -s tests -v`.
 - `.github/workflows/validate.yml`: unit tests, hassfest and HACS validation.

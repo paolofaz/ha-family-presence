@@ -16,6 +16,10 @@ in-memory shadow state + logs only (NO production entity writes)
 
 Independent YAML automations continue controlling alarm, heating, warnings and notifications.
 
+## BLE provider contracts
+
+Family Presence consumes **standard Home Assistant entities** produced by independent BLE integrations. Neither raw iBeacon identity (UUID/Major/Minor) nor Watch IRKs belong in the FSM. The provider already applies configured 180-second absence timeouts; do **not** stack another mandatory 180-second bag absence delay in the FSM. See [ble-sources.md](ble-sources.md) for reviewed code, startup semantics, polling intervals and the ~180s period before a physically departed bag becomes OFF.
+
 ## Source and transition contracts
 
 - Phone leaving `home` → `away`, phone returning `home` → `home`; invalid transitions are ignored.
@@ -42,7 +46,7 @@ The in-memory `all_away()` returns unknown if any member is uninitialized. **The
 ## Safety limitations and upcoming tasks
 
 - Source-event ordering has initial per-person serialization and revision checks, but needs HA integration tests for rapid races, setup/teardown, source restores and concurrency.
-- Confirm bag OFF stability/debouncing and define an explicit, auditable manual override for a child returning without their bag, before live alarm migration.
+- Measure false bag OFF rates under the upstream 180s timeout and define an explicit, auditable manual override for a child returning without their bag, before live alarm migration.
 - Build persistent internal state, stable person IDs, editable source mappings and fully translated diagnostic entities.
 - Build actual time-aligned parity comparisons with the original YAML. A snapshot in the log is not proof of parity.
 - Add a conservative all-away binary sensor **only after** reboot/unavailable behavior has been reviewed. The all-away output must not arm the alarm on uncertain states.
