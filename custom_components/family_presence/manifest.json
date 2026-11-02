@@ -1,0 +1,15 @@
+{
+  "domain": "family_presence",
+  "name": "Family Presence",
+  "codeowners": [
+    "@paolofaz"
+  ],
+  "config_flow": false,
+  "dependencies": [],
+  "documentation": "https://github.com/paolofaz/ha-family-presence",
+  "integration_type": "helper",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/paolofaz/ha-family-presence/issues",
+  "requirements": [],
+  "version": "0.0.1"
+}
