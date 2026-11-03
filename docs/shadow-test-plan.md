@@ -25,7 +25,7 @@ for production automation triggers.
 10. Reboot after a manual action: shadow state and reason should return from
     Family Presence's own snapshot, marked `restored_from_storage`.
 11. In the new sensor attributes verify `comparison_status`, `divergence_since`,
-    `last_ignored_event` and `last_ignored_reason`. An outside-window bag OFF
+    `last_ignored_event`, `last_ignored_reason` and `recent_events`. An outside-window bag OFF
     should be logged as ignored, without changing presence.
 12. After upgrading from Alpha 5, verify state restore, change only a bag's
     configured schedule, then reload: HOME/AWAY should survive both operations.
