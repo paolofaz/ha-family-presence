@@ -60,11 +60,13 @@ class ShadowAllAwayTests(unittest.IsolatedAsyncioTestCase):
         self.raw = {
             "phone": "home", "watch": "on",
             "reference": "home", "phone2": "not_home",
+            "reference2": "home",
         }
         self.members = [
             PersonSources("paolo", "Paolo", iphone="phone", watch="watch",
                           reference="reference"),
-            PersonSources("giulia", "Giulia", iphone="phone2"),
+            PersonSources("giulia", "Giulia", iphone="phone2",
+                          reference="reference2"),
         ]
         self.engine = self.new()
         self.module = load_binary_sensor_module()
@@ -146,6 +148,47 @@ class ShadowAllAwayTests(unittest.IsolatedAsyncioTestCase):
         await self.engine.process("paolo", Event.IPHONE_ARRIVED,
                                   event_time=self.now)
         self.assertFalse(sensor.is_on)
+
+    async def test_comparison_attributes_follow_legacy_helper_events(self):
+        sensor = await self.entity()
+        for key in self.engine.people:
+            await self.engine.force_state(key, State.HOME)
+        attrs = sensor.extra_state_attributes
+        self.assertEqual(attrs["legacy_comparison_status"], "aligned")
+        self.assertIs(attrs["legacy_expected_all_away"], False)
+        self.assertIs(attrs["aggregate_matches_legacy"], True)
+        self.assertEqual(attrs["legacy_differing_members"], [])
+
+        self.now += timedelta(seconds=1)
+        await self.engine.force_state("paolo", State.AWAY)
+        self.now += timedelta(seconds=1)
+        await self.engine.force_state("giulia", State.AWAY)
+        attrs = sensor.extra_state_attributes
+        self.assertEqual(attrs["legacy_comparison_status"], "aggregate_divergence")
+        self.assertIs(attrs["legacy_expected_all_away"], False)
+        self.assertIs(attrs["aggregate_matches_legacy"], False)
+        self.assertEqual(attrs["legacy_differing_members"], ["Paolo", "Giulia"])
+        self.assertIsNotNone(attrs["legacy_divergence_since"])
+
+        self.raw["reference"] = "away"
+        self.engine.notify_source_update("paolo")
+        self.raw["reference2"] = "away"
+        self.engine.notify_source_update("giulia")
+        attrs = sensor.extra_state_attributes
+        self.assertEqual(attrs["legacy_comparison_status"], "aligned")
+        self.assertIs(attrs["legacy_expected_all_away"], True)
+        self.assertIs(attrs["aggregate_matches_legacy"], True)
+        self.assertIsNone(attrs["legacy_divergence_since"])
+
+    async def test_unavailable_reference_does_not_forge_comparison(self):
+        sensor = await self.entity()
+        self.raw["reference2"] = "unavailable"
+        self.engine.notify_source_update("giulia")
+        attrs = sensor.extra_state_attributes
+        self.assertEqual(attrs["legacy_comparison_status"], "reference_unavailable")
+        self.assertEqual(attrs["legacy_unavailable_reference_members"], ["Giulia"])
+        self.assertIsNone(attrs["legacy_expected_all_away"])
+        self.assertIsNone(attrs["aggregate_matches_legacy"])
 
     async def test_near_home_and_unknown_are_off(self):
         sensor = await self.entity()
