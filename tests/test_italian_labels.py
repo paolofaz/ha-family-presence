@@ -10,17 +10,15 @@ from custom_components.family_presence.labels import (
 
 
 class ItalianLabelsTests(unittest.TestCase):
-    def test_bag_policy_labels_explain_real_behavior(self):
+    def test_manual_reasons_are_in_italian(self):
         self.assertEqual(
-            BAG_POLICY_CHOICES_IT,
-            {
-                "always": "Priorità assoluta",
-                "legacy": "Fascia scolastica (lun–ven 07:00–09:10)",
-            },
+            decide(State.AWAY, Event.MANUAL_HOME).reason,
+            "Forzato in casa manualmente",
         )
-        self.assertEqual(bag_policy_label(BagPolicy.ALWAYS), "Priorità assoluta")
-        self.assertIn("scolastica", bag_policy_label(BagPolicy.LEGACY))
-        self.assertEqual(BagPolicy.ALWAYS.value, "always")  # Config stays compatible.
+        self.assertEqual(
+            decide(State.HOME, Event.MANUAL_AWAY).reason,
+            "Forzato fuori casa manualmente",
+        )
 
     def test_every_current_fsm_reason_renders_in_italian(self):
         cases = [
@@ -43,15 +41,16 @@ class ItalianLabelsTests(unittest.TestCase):
             (State.NEAR_HOME, Event.PHYSICAL_ENTRY,
              Evidence(watch_detected=True, physical_event_label="lock unlocked")),
             (State.AWAY, Event.BAG_ARRIVED, Evidence()),
-            (State.HOME, Event.BAG_LEFT, Evidence(school_bag_window=True)),
-            (State.HOME, Event.RECONCILE, Evidence(bag_status=BagStatus.ABSENT)),
+            (State.HOME, Event.BAG_LEFT, Evidence(bag_departure_active=True)),
+
         ]
         for current, event, evidence in cases:
             decision = decide(current, event, evidence)
             self.assertIsNotNone(decision, msg=str((current, event)))
             translated = reason_label(decision.reason)
             with self.subTest(event=event, original=decision.reason):
-                self.assertNotEqual(translated, decision.reason)
+                if event not in (Event.MANUAL_HOME, Event.MANUAL_AWAY):
+                    self.assertNotEqual(translated, decision.reason)
                 self.assertNotIn("Watch detected", translated)
                 self.assertNotIn("Bag ", translated)
                 self.assertNotIn("iPhone left", translated)

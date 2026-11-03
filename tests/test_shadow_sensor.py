@@ -103,34 +103,28 @@ class ShadowSensorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sensor.native_value, "away")
         self.assertIs(sensor.extra_state_attributes["matches_legacy"], True)
 
-    async def test_bag_policy_is_displayed_in_italian_without_changing_code(self):
-        engine = self.new()
-        sensor = self.cls("entry", engine, "person")
-        attrs = sensor.extra_state_attributes
-        self.assertIsNone(attrs["bag_policy"])  # No bag is configured for this person.
-        self.assertIsNone(attrs["bag_policy_code"])
-        with_bag = ShadowCoordinator(
-            [PersonSources("bag_person", "Member", bag="binary_sensor.bag")],
+    async def test_bag_schedule_is_visible_to_lovelace(self):
+        engine = ShadowCoordinator(
+            [PersonSources("kid", "Member", bag="bag")],
             read_state=self.s.get, clock=lambda: self.now,
         )
-        attrs = self.cls("entry", with_bag, "bag_person").extra_state_attributes
-        self.assertEqual(attrs["bag_policy"], "Priorità assoluta")
-        self.assertEqual(attrs["bag_policy_code"], "always")
+        attrs = self.cls("entry", engine, "kid").extra_state_attributes
+        self.assertEqual(attrs["bag_window_start"], "07:00")
+        self.assertEqual(attrs["bag_window_end"], "09:10")
+        self.assertTrue(attrs["bag_enabled"])
+        self.assertEqual(attrs["bag_days"], [0, 1, 2, 3, 4])
 
-    async def test_manual_exception_is_visible_to_lovelace(self):
-        readings = {"bag": "off"}
+    async def test_manual_force_is_visible_to_lovelace(self):
         engine = ShadowCoordinator(
-            [PersonSources("kid", "Child", bag="bag")],
-            read_state=readings.get, clock=lambda: self.now,
+            [PersonSources("kid", "Member")],
+            read_state=self.s.get, clock=lambda: self.now,
         )
-        self.assertTrue(await engine.confirm_home_without_bag("kid"))
-        sensor = self.cls("entry", engine, "kid")
-        attrs = sensor.extra_state_attributes
-        self.assertTrue(attrs["manual_home_active"])
-        self.assertIsNotNone(attrs["manual_home_since"])
-        self.assertFalse(attrs["manual_review_required"])
-        self.assertEqual(attrs["manual_last_action"], "home_confirmed")
-        self.assertIsNotNone(attrs["manual_review_due_at"])
+        await engine.force_state("kid", State.HOME)
+        attrs = self.cls("entry", engine, "kid").extra_state_attributes
+        self.assertEqual(attrs["manual_last_action"], "manual_home")
+        self.assertIsNotNone(attrs["manual_last_action_at"])
+        self.assertEqual(attrs["reason"], "Forzato in casa manualmente")
+        self.assertEqual(attrs["state_origin"], "manual_force")
 
     async def test_diagnostic_reports_missing_reason_instead_of_inventing_it(self):
         coordinator = self.new()

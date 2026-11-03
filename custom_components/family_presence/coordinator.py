@@ -8,7 +8,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone, tzinfo
 from typing import Any, Awaitable, Callable
 
-from .fsm import BagPolicy, BagStatus, Decision, Event, Evidence, State, decide, recent_before, school_bag_window
+from .fsm import BagPolicy, BagStatus, Decision, Event, Evidence, State, decide, recent_before
+from .bag_schedule import BagSchedule
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,7 +31,8 @@ class PersonSources:
     watch: str | None = None
     bag: str | None = None
     reference: str | None = None
-    bag_policy: BagPolicy = BagPolicy.ALWAYS
+    bag_policy: BagPolicy = BagPolicy.ALWAYS  # Used only for old snapshot migration.
+    bag_schedule: BagSchedule = BagSchedule()
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,16 +67,9 @@ class PersonRuntime:
     # The legacy YAML reference is never used to seed or reconcile runtime.
     state_origin: str = "unknown"
     reason_origin: str = "not_recorded"
-    # A deliberate, human-confirmed HOME without the backpack. This safety
-    # hold never auto-expires into AWAY; after 8h it requests manual review.
-    manual_home_active: bool = False
-    post_manual_ambiguity: bool = False
-    manual_home_since: datetime | None = None
-    manual_home_review_at: datetime | None = None
+    # Manual forcing is a single event, not a hold or priority override.
     manual_last_action: str | None = None
     manual_last_action_at: datetime | None = None
-    manual_suppressed_event: Event | None = None
-    manual_suppressed_at: datetime | None = None
     last_blocked_event: Event | None = None
     last_blocked_at: datetime | None = None
     decisions: list[ShadowDecision] = field(default_factory=list)
@@ -154,21 +149,26 @@ class ShadowCoordinator:
         self._notify(person)
 
     @staticmethod
-    def _fingerprint(person: PersonSources, *, legacy: bool = False) -> str:
-        """Fingerprint only FSM inputs, not the read-only YAML comparator.
+    def _fingerprint(
+        person: PersonSources, *, legacy: bool = False,
+        old_format: bool = False,
+    ) -> str:
+        """New snapshots use source + schedule; legacy formats use old policy.
 
-        Alpha 1–3 stored the comparator in the fingerprint. Accept that older
-        format once during migration, while the new format remains independent
-        of any changes to the baseline helper.
+        The old YAML helper was part of the v1 fingerprint only. It never
+        affects the current FSM and is only checked for format-1 migration.
         """
         mapping = {
             "iphone": person.iphone,
             "watch": person.watch,
             "bag": person.bag,
-            "bag_policy": person.bag_policy.value,
         }
-        if legacy:
-            mapping["reference"] = person.reference
+        if legacy or old_format:
+            mapping["bag_policy"] = person.bag_policy.value
+            if legacy:
+                mapping["reference"] = person.reference
+        else:
+            mapping["bag_schedule"] = person.bag_schedule.to_dict()
         return hashlib.sha256(
             json.dumps(mapping, sort_keys=True).encode("utf-8")
         ).hexdigest()
@@ -176,7 +176,7 @@ class ShadowCoordinator:
     def snapshot(self) -> dict[str, Any]:
         """Serialize only shadow-owned state and diagnostic explanation."""
         return {
-            "format": 3,
+            "format": 4,
             "people": {
                 key: {
                     "fingerprint": self._fingerprint(self.people[key]),
@@ -185,14 +185,7 @@ class ShadowCoordinator:
                     "last_changed": (
                         rt.last_changed.isoformat() if rt.last_changed else None
                     ),
-                    "manual_home": {
-                        "active": rt.manual_home_active,
-                        "post_manual_ambiguity": rt.post_manual_ambiguity,
-                        "since": rt.manual_home_since.isoformat() if rt.manual_home_since else None,
-                        "review_at": (
-                            rt.manual_home_review_at.isoformat()
-                            if rt.manual_home_review_at else None
-                        ),
+                    "manual": {
                         "last_action": rt.manual_last_action,
                         "last_action_at": (
                             rt.manual_last_action_at.isoformat()
@@ -212,7 +205,7 @@ class ShadowCoordinator:
         itself establish all-away. Do not restore physical event timestamps or
         infer a near_home age. Version 1 snapshots are supported for upgrade.
         """
-        if not isinstance(data, dict) or data.get("format") not in (1, 2, 3):
+        if not isinstance(data, dict) or data.get("format") not in (1, 2, 3, 4):
             return 0
         people = data.get("people")
         if not isinstance(people, dict):
@@ -224,22 +217,13 @@ class ShadowCoordinator:
             if not isinstance(record, dict):
                 continue
             if record.get("fingerprint") != self._fingerprint(
-                self.people[key], legacy=legacy
+                self.people[key], legacy=legacy, old_format=data["format"] in (2, 3)
             ):
                 continue
             saved_state = parse_state(record.get("state"))
-            manual = record.get("manual_home") if data["format"] == 3 else None
-            pending_review = (
-                isinstance(manual, dict)
-                and manual.get("post_manual_ambiguity") is True
-                and record.get("state") is None
-                and self.people[key].bag_policy == BagPolicy.ALWAYS
-                and bool(self.people[key].bag)
-            )
-            if saved_state is None and not pending_review:
+            if saved_state is None:
                 continue
             rt.state = saved_state
-            rt.post_manual_ambiguity = pending_review
             rt.state_origin = "saved_shadow_unverified"
             rt.restored_from_storage = True
 
@@ -260,133 +244,33 @@ class ShadowCoordinator:
                     pass
             rt.near_home_entered_at = None
 
-            # Persist a manual HOME hold through restart. Never activate one
-            # from corrupted storage or in a non-strict bag policy.
-            if (
-                isinstance(manual, dict)
-                and manual.get("active") is True
-                and saved_state == State.HOME
-                and self.people[key].bag
-                and self.people[key].bag_policy == BagPolicy.ALWAYS
-            ):
-                ts_manual = manual.get("since")
-                try:
-                    since = _aware_utc(datetime.fromisoformat(ts_manual))
-                except (TypeError, ValueError):
-                    since = None
-                if since is not None:
-                    rt.manual_home_active = True
-                    rt.manual_home_since = since
-                    ts_review = manual.get("review_at")
-                    try:
-                        rt.manual_home_review_at = _aware_utc(
-                            datetime.fromisoformat(ts_review)
-                        )
-                    except (TypeError, ValueError):
-                        rt.manual_home_review_at = since + timedelta(hours=8)
+            manual = record.get("manual") if data["format"] == 4 else None
             if isinstance(manual, dict):
-                rt.manual_last_action = (
-                    manual.get("last_action")
-                    if isinstance(manual.get("last_action"), str) else None
-                )
-                ts_action = manual.get("last_action_at")
-                try:
-                    rt.manual_last_action_at = _aware_utc(
-                        datetime.fromisoformat(ts_action)
-                    )
-                except (TypeError, ValueError):
-                    pass
+                action = manual.get("last_action")
+                rt.manual_last_action = action if isinstance(action, str) else None
+                ts = manual.get("last_action_at")
+                if isinstance(ts, str):
+                    try:
+                        rt.manual_last_action_at = _aware_utc(
+                            datetime.fromisoformat(ts)
+                        )
+                    except ValueError:
+                        pass
             restored += 1
         return restored
 
-    def manual_home_available(self, person: str) -> bool:
-        """Only a person with a strict, currently OFF backpack can be confirmed."""
-        p = self.people[person]
-        return (
-            p.bag_policy == BagPolicy.ALWAYS
-            and bool(p.bag)
-            and self._read(p.bag) == "off"
-            and not self.runtime[person].manual_home_active
+    async def force_state(self, person: str, state: State) -> ShadowDecision:
+        """One-off, explicit human event; future valid sensor events may win."""
+        if state not in (State.HOME, State.AWAY):
+            raise ValueError("Only HOME or AWAY can be forced")
+        self.note_person_event(person)  # Invalidate any delayed Watch ON.
+        decision = await self.process(
+            person,
+            Event.MANUAL_HOME if state == State.HOME else Event.MANUAL_AWAY,
+            event_time=self._clock(),
         )
-
-    def manual_review_due(self, person: str) -> bool:
-        """A review reminder is advisory: it NEVER transitions HOME to AWAY."""
-        rt = self.runtime[person]
-        return (
-            rt.manual_home_active
-            and rt.manual_home_review_at is not None
-            and _aware_utc(self._clock()) >= rt.manual_home_review_at
-        )
-
-    async def confirm_home_without_bag(self, person: str) -> bool:
-        """Explicit shadow-only human confirmation overrides strict bag absence.
-
-        Hold persists until a real bag presence or explicit revocation, even
-        after the review deadline. No implicit phone/Watch/gate event can force
-        AWAY while the confirmed bag is still absent or unavailable.
-        """
-        rt = self.runtime[person]
-        async with rt.lock:
-            if not self.manual_home_available(person):
-                return False
-            now = _aware_utc(self._clock())
-            rt.manual_home_active = True
-            rt.post_manual_ambiguity = False
-            rt.manual_home_since = now
-            rt.manual_home_review_at = now + timedelta(hours=8)
-            rt.manual_last_action = "home_confirmed"
-            rt.manual_last_action_at = now
-            rt.manual_suppressed_event = None
-            rt.manual_suppressed_at = None
-            rt.state = State.HOME
-            rt.last_reason = "Presenza in casa confermata manualmente senza zaino"
-            rt.last_changed = now
-            rt.restored_from_storage = False
-            rt.state_origin = "manual_confirmation"
-            rt.reason_origin = "manual_confirmation"
-            rt.source_revision += 1  # Cancel any pending Watch ON hypothesis.
-            self._notify(person)
-            return True
-
-    async def revoke_manual_home(self, person: str) -> bool:
-        """Explicitly revoke the hold into UNKNOWN, never automatic AWAY.
-
-        Clearing a manual presence with the bag still OFF must not cause an
-        immediate all-away verdict that could arm an alarm in the future.
-        """
-        rt = self.runtime[person]
-        async with rt.lock:
-            if not rt.manual_home_active:
-                return False
-            now = _aware_utc(self._clock())
-            rt.manual_home_active = False
-            rt.post_manual_ambiguity = True
-            rt.manual_home_since = None
-            rt.manual_home_review_at = None
-            rt.manual_last_action = "revoked_requires_new_evidence"
-            rt.manual_last_action_at = now
-            rt.state = None
-            rt.last_reason = "Conferma manuale revocata: presenza da verificare"
-            rt.last_changed = now
-            rt.restored_from_storage = False
-            rt.state_origin = "manual_revocation_unknown"
-            rt.reason_origin = "manual_confirmation"
-            rt.source_revision += 1
-            self._notify(person)
-            return True
-
-    def _clear_manual_home(self, person: str) -> None:
-        """A confirmed bag PRESENT closes the exception without forcing AWAY."""
-        rt = self.runtime[person]
-        if not rt.manual_home_active:
-            return
-        now = _aware_utc(self._clock())
-        rt.manual_home_active = False
-        rt.manual_home_since = None
-        rt.manual_home_review_at = None
-        rt.manual_last_action = "bag_present"
-        rt.manual_last_action_at = now
-        self._notify(person)
+        assert decision is not None
+        return decision
 
     def note_person_event(self, person: str) -> int:
         """Monotonic per-person revision. Called synchronously on HA callback."""
@@ -422,7 +306,10 @@ class ShadowCoordinator:
             watch_detected=bool(config.watch) and self._read(config.watch) == "on",
             physical_event_label={"gate": "gate", "door_open": "door opened", "unlock": "lock unlocked"}.get(kind, "physical event"),
             bag_status=status,
-            school_bag_window=school_bag_window(self._clock().astimezone(self.local_timezone)),
+            bag_departure_active=config.bag_schedule.includes(
+                reference.astimezone(self.local_timezone)
+            ),
+            bag_enabled=config.bag_schedule.enabled,
         )
 
     async def process(
@@ -440,6 +327,15 @@ class ShadowCoordinator:
         config = self.people[person]
         rt = self.runtime[person]
         async with rt.lock:
+            if (
+                rt.manual_last_action_at is not None
+                and event not in (Event.MANUAL_HOME, Event.MANUAL_AWAY)
+                and at <= rt.manual_last_action_at
+            ):
+                # A delayed event from before a manual button press must not
+                # undo the forced state; only events fired AFTER may do so.
+                return None
+
             if event == Event.WATCH_SEEN:
                 await self._sleep(self.windows.watch_on_delay_seconds)
                 # Recheck both revision and live watch state after 2 seconds.
@@ -454,6 +350,10 @@ class ShadowCoordinator:
                 reference = _aware_utc(last_seen_before_off)
             elif event == Event.WATCH_LOST:
                 reference = None
+            elif event == Event.BAG_LEFT:
+                # The schedule applies at the actual OFF event timestamp,
+                # not at queue-processing time (could cross a boundary).
+                reference = at
             else:
                 reference = _aware_utc(self._clock())
             evidence = self._evidence(config, reference or at, kind=physical_kind)
@@ -464,57 +364,29 @@ class ShadowCoordinator:
                     bag_status=evidence.bag_status,
                 )
 
-            # After manual revocation with an absent bag, do not interpret
-            # stale OFF, shared gate or Watch alone as proof of AWAY.
-            # Wait for a genuine phone departure or for the bag to return.
-            if rt.post_manual_ambiguity:
-                if evidence.bag_status == BagStatus.PRESENT or event == Event.IPHONE_LEFT:
-                    rt.post_manual_ambiguity = False
-                    self._notify(person)
-                else:
-                    return None
+            # Bag transitions are real events, never a permanent OFF veto.
+            # If its state has since changed, drop the delayed stale callback.
+            if event == Event.BAG_LEFT and evidence.bag_status != BagStatus.ABSENT:
+                return None
+            if event == Event.BAG_ARRIVED and evidence.bag_status != BagStatus.PRESENT:
+                return None
 
-            # Human-confirmed HOME without a bag is stronger than indirect
-            # BLE/phone/condo-gate evidence. Its review deadline never causes
-            # an automatic change. Only observed bag presence ends the hold.
-            if rt.manual_home_active:
-                if evidence.bag_status == BagStatus.PRESENT:
-                    self._clear_manual_home(person)
-                else:
-                    if event != Event.RECONCILE:
-                        rt.manual_suppressed_event = event
-                        rt.manual_suppressed_at = _aware_utc(self._clock())
-                        self._notify(person)
-                    return None
-
-            # Bag PRESENT never locks HOME; only the rising OFF->ON event
-            # transitions to HOME. ABSENT vetoes every positive source.
-            if (
-                config.bag_policy == BagPolicy.ALWAYS
-                and evidence.bag_status == BagStatus.ABSENT
-                and event in (Event.IPHONE_ARRIVED, Event.WATCH_SEEN, Event.PHYSICAL_ENTRY, Event.BAG_ARRIVED)
-            ):
-                rt.last_blocked_event = event
-                rt.last_blocked_at = _aware_utc(self._clock())
-                if self.report_block:
-                    self.report_block(ShadowBlocked(
-                        person=person, event=event, when=rt.last_blocked_at,
-                        reference=parse_state(self._read(config.reference)) if config.reference else None,
-                    ))
-                self._notify(person)
-
-            result: Decision | None = decide(rt.state, event, evidence, bag_policy=config.bag_policy)
+            result: Decision | None = decide(rt.state, event, evidence)
             if result is None:
                 return None
             previous = rt.state
             rt.state = result.state
             rt.last_reason = result.reason
             rt.restored_from_storage = False
-            rt.state_origin = "observed_transition"
-            rt.reason_origin = "observed_event"
+            manual = event in (Event.MANUAL_HOME, Event.MANUAL_AWAY)
+            rt.state_origin = "manual_force" if manual else "observed_transition"
+            rt.reason_origin = "manual_force" if manual else "observed_event"
             when = _aware_utc(self._clock())
+            if manual:
+                rt.manual_last_action = event.value
+                rt.manual_last_action_at = when
             near_home_duration: float | None = None
-            if result.state != previous:
+            if result.state != previous or manual:
                 rt.last_changed = when
                 if previous == State.NEAR_HOME:
                     if rt.near_home_entered_at is not None:

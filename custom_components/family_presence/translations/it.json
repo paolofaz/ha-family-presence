@@ -15,13 +15,12 @@
       },
       "person": {
         "title": "Componente della famiglia",
-        "description": "Associa almeno un sensore. Il vecchio YAML è facoltativo e serve soltanto per confrontare gli stati.",
+        "description": "Associa le sorgenti di presenza. Configura la fascia dello zaino dopo l'installazione. Il vecchio YAML serve soltanto al confronto.",
         "data": {
           "person_name": "Nome",
           "iphone_tracker": "Tracker telefono (facoltativo)",
           "watch_sensor": "Sensore BLE indossabile (facoltativo)",
           "bag_sensor": "Sensore zaino (facoltativo)",
-          "bag_policy": "Comportamento dello zaino (priorità assoluta / fascia scolastica)",
           "legacy_presence_entity": "Stato FSM YAML precedente (facoltativo, SOLO confronto)"
         }
       },
@@ -106,7 +105,7 @@
         "title": "Impostazioni Family Presence",
         "menu_options": {
           "windows": "Finestre temporali",
-          "bag_person": "Priorità degli zaini"
+          "bag_person": "Orari e giorni degli zaini"
         }
       },
       "windows": {
@@ -122,23 +121,27 @@
         }
       },
       "bag_person": {
-        "title": "Scegli una persona",
+        "title": "Scegli la persona per lo zaino",
         "description": "Seleziona la persona per la quale vuoi modificare la precedenza dello zaino.",
         "data": {
           "person": "Componente della famiglia"
         }
       },
-      "bag_policy": {
-        "title": "Regola dello zaino",
-        "description": "Imposta la regola per {person}. Priorità assoluta: zaino assente impone away a ogni ora. Fascia scolastica: uscita dello zaino rilevante solo dal lunedì al venerdì, 07:00–09:10. Lo zaino presente non blocca home.",
+      "bag_schedule": {
+        "title": "Orari dello zaino",
+        "description": "Configura lo zaino di {person}. ON→OFF produce Fuori casa soltanto durante gli orari e giorni scelti. OFF→ON produce In casa a qualsiasi ora. Se disabilitato, lo zaino non influenza la presenza. Inizio e fine uguali (ad esempio 00:00–00:00) indicano 24 ore.",
         "data": {
-          "bag_policy": "Comportamento"
+          "enabled": "Abilita zaino",
+          "start": "Ora inizio",
+          "end": "Ora fine",
+          "days": "Giorni attivi"
         }
       }
     },
     "error": {
       "invalid_person": "Persona non disponibile.",
-      "invalid_policy": "Regola dello zaino non valida."
+      "invalid_policy": "Regola dello zaino non valida.",
+      "invalid_schedule": "Impostazioni orario dello zaino non valide."
     },
     "abort": {
       "person_not_found": "La persona non è più disponibile o non ha uno zaino configurato."

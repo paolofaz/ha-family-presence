@@ -15,13 +15,14 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util import dt as dt_util
 
 from .const import (
-    CONF_ALARM, CONF_BAG, CONF_BAG_POLICY, CONF_BAG_POLICIES,
+    CONF_ALARM, CONF_BAG, CONF_BAG_POLICY, CONF_BAG_POLICIES, CONF_BAG_SCHEDULES,
     CONF_DOOR, CONF_GATE_ENTITIES,
     CONF_IPHONE, CONF_LOCK, CONF_PEOPLE, CONF_PERSON_NAME, CONF_PERSON_ID, CONF_REFERENCE,
     CONF_WATCH,
 )
 from .coordinator import PersonSources, ShadowBlocked, ShadowCoordinator, ShadowDecision, Windows
 from .fsm import BagPolicy, Event
+from .bag_schedule import BagSchedule, legacy_schedule
 from .labels import reason_label
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ def _person_specs(
     config: dict[str, Any], options: dict[str, Any] | None = None
 ) -> list[PersonSources]:
     policies = (options or {}).get(CONF_BAG_POLICIES, {})
+    schedules = (options or {}).get(CONF_BAG_SCHEDULES, {})
     return [
         PersonSources(
             key=p.get(CONF_PERSON_ID) or p[CONF_PERSON_NAME].strip().casefold(),
@@ -55,8 +57,18 @@ def _person_specs(
             reference=p.get(CONF_REFERENCE),
             bag_policy=BagPolicy(policies.get(
                 p.get(CONF_PERSON_ID) or p[CONF_PERSON_NAME].strip().casefold(),
-                p.get(CONF_BAG_POLICY, BagPolicy.ALWAYS.value),
+                p.get(CONF_BAG_POLICY, BagPolicy.LEGACY.value),
             )),
+            bag_schedule=(
+                BagSchedule.from_dict(schedules[
+                    p.get(CONF_PERSON_ID) or p[CONF_PERSON_NAME].strip().casefold()
+                ])
+                if (p.get(CONF_PERSON_ID) or p[CONF_PERSON_NAME].strip().casefold()) in schedules
+                else legacy_schedule(policies.get(
+                    p.get(CONF_PERSON_ID) or p[CONF_PERSON_NAME].strip().casefold(),
+                    p.get(CONF_BAG_POLICY, BagPolicy.LEGACY.value),
+                ))
+            ),
         )
         for p in config[CONF_PEOPLE]
     ]

@@ -32,46 +32,29 @@ class TestPresenceFSM(unittest.TestCase):
         self.assertIsNone(decide(State.NEAR_HOME, Event.PHYSICAL_ENTRY))
         self.assertEqual(decide(State.NEAR_HOME, Event.PHYSICAL_ENTRY, Evidence(watch_detected=True)).state, State.HOME)
 
-    def test_bags_preserve_existing_semantics(self):
-        self.assertEqual(decide(State.AWAY, Event.BAG_ARRIVED).state, State.HOME)
-        self.assertIsNotNone(decide(State.HOME, Event.BAG_ARRIVED))
+    def test_bag_departure_requires_active_schedule(self):
         self.assertIsNone(decide(State.HOME, Event.BAG_LEFT))
-        self.assertEqual(decide(State.HOME, Event.BAG_LEFT, Evidence(school_bag_window=True)).state, State.AWAY)
+        e = Evidence(bag_departure_active=True, bag_status=BagStatus.ABSENT)
+        self.assertEqual(decide(State.HOME, Event.BAG_LEFT, e).state, State.AWAY)
+        self.assertIsNone(decide(State.HOME, Event.BAG_LEFT,
+                                 Evidence(bag_departure_active=True, bag_enabled=False)))
 
-    def test_bag_off_wins_over_watch_gate_and_door(self):
-        evidence = Evidence(bag_status=BagStatus.ABSENT, gate_entry=True, door_open_entry=True)
-        self.assertIsNone(decide(State.AWAY, Event.WATCH_SEEN, evidence))
-        self.assertEqual(decide(State.NEAR_HOME, Event.PHYSICAL_ENTRY, evidence).state, State.AWAY)
-
-    def test_bag_off_wins_over_iphone_and_restart(self):
-        evidence = Evidence(bag_status=BagStatus.ABSENT)
-        self.assertIsNone(decide(State.AWAY, Event.IPHONE_ARRIVED, evidence))
-        self.assertEqual(decide(State.HOME, Event.IPHONE_ARRIVED, evidence),
-                         Decision(State.AWAY, "Bag absent (priority)"))
-        self.assertEqual(decide(State.HOME, Event.RECONCILE, evidence).state, State.AWAY)
-
-    def test_bag_off_all_day_and_arrival_releases_veto(self):
-        absent = Evidence(bag_status=BagStatus.ABSENT, school_bag_window=False)
-        self.assertEqual(decide(State.HOME, Event.BAG_LEFT, absent).state, State.AWAY)
-        self.assertEqual(decide(State.AWAY, Event.BAG_ARRIVED, absent), None)
+    def test_bag_return_is_unconditional_when_enabled(self):
         self.assertEqual(decide(State.AWAY, Event.BAG_ARRIVED,
-                                Evidence(bag_status=BagStatus.PRESENT)).state, State.HOME)
+                                Evidence(bag_departure_active=False)).state, State.HOME)
+        self.assertIsNone(decide(State.AWAY, Event.BAG_ARRIVED,
+                                 Evidence(bag_enabled=False)))
 
-    def test_bag_unknown_and_not_configured_never_veto(self):
-        for status in [BagStatus.UNKNOWN, BagStatus.NOT_CONFIGURED]:
-            with self.subTest(status=status):
-                evidence = Evidence(bag_status=status, door_open_entry=True)
-                self.assertEqual(decide(State.AWAY, Event.WATCH_SEEN, evidence).state, State.HOME)
+    def test_absent_bag_does_not_veto_future_phone_or_watch(self):
+        e = Evidence(bag_status=BagStatus.ABSENT, gate_entry=True)
+        self.assertEqual(decide(State.AWAY, Event.IPHONE_ARRIVED, e).state, State.HOME)
+        self.assertEqual(decide(State.AWAY, Event.WATCH_SEEN, e).state, State.HOME)
+        self.assertIsNone(decide(State.HOME, Event.RECONCILE, e))
 
-    def test_legacy_policy_preserves_old_false_arrival(self):
-        absent = Evidence(bag_status=BagStatus.ABSENT, gate_entry=True)
-        self.assertEqual(decide(State.AWAY, Event.WATCH_SEEN, absent,
-                                bag_policy=BagPolicy.LEGACY).state, State.HOME)
-        self.assertIsNone(decide(State.HOME, Event.BAG_LEFT, absent,
-                                 bag_policy=BagPolicy.LEGACY))
-        self.assertEqual(decide(State.HOME, Event.BAG_LEFT,
-                                Evidence(bag_status=BagStatus.ABSENT, school_bag_window=True),
-                                bag_policy=BagPolicy.LEGACY).state, State.AWAY)
+    def test_manual_events_always_set_current_state(self):
+        self.assertEqual(decide(State.AWAY, Event.MANUAL_HOME).state, State.HOME)
+        self.assertEqual(decide(State.HOME, Event.MANUAL_AWAY).state, State.AWAY)
+        self.assertIsNotNone(decide(State.HOME, Event.MANUAL_HOME))
 
     def test_windows(self):
         end = datetime(2026, 11, 2, 12, 0, tzinfo=timezone.utc)

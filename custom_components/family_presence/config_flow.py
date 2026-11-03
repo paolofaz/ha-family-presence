@@ -10,10 +10,14 @@ from homeassistant import config_entries
 from homeassistant.config_entries import OptionsFlowWithReload
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
+from homeassistant.helpers.selector import (
+    EntitySelector, EntitySelectorConfig, SelectSelector, SelectSelectorConfig,
+    TimeSelector,
+)
 
 from .const import (
     CONF_ADD_ANOTHER, CONF_ALARM, CONF_BAG, CONF_BAG_POLICY, CONF_BAG_POLICIES,
+    CONF_BAG_SCHEDULES, CONF_BAG_ENABLED, CONF_BAG_START, CONF_BAG_END, CONF_BAG_DAYS,
     CONF_DOOR, CONF_GATE_ENTITIES,
     CONF_HOUSEHOLD_NAME, CONF_IPHONE, CONF_LOCK, CONF_PEOPLE, CONF_PERSON_NAME,
     CONF_PERSON_ID,
@@ -21,7 +25,7 @@ from .const import (
     CONF_WATCH, DEFAULT_WINDOWS, DOMAIN,
 )
 from .fsm import BagPolicy
-from .labels import BAG_POLICY_CHOICES_IT
+from .bag_schedule import BagSchedule, legacy_schedule
 
 
 def entity(domain: str) -> EntitySelector:
@@ -43,7 +47,6 @@ PERSON_SCHEMA = vol.Schema({
     vol.Optional(CONF_WATCH): entity("binary_sensor"),
     vol.Optional(CONF_BAG): entity("binary_sensor"),
     vol.Optional(CONF_REFERENCE): entity("input_select"),
-    vol.Optional(CONF_BAG_POLICY, default=BagPolicy.ALWAYS.value): vol.In(BAG_POLICY_CHOICES_IT),
 })
 # Source mapping belongs to Reconfigure, behavioral choices to Configure.
 PERSON_RECONFIGURE_SCHEMA = vol.Schema({
@@ -250,7 +253,8 @@ class FamilyPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     **{k: v for k, v in user_input.items() if v},
                     CONF_PERSON_NAME: user_input[CONF_PERSON_NAME].strip(),
                     CONF_PERSON_ID: uuid4().hex,
-                    CONF_BAG_POLICY: BagPolicy.ALWAYS.value,
+                    # New members use the school-hours schedule by default.
+                    # An old policy code is retained only when editing old data.
                 }
                 return await self._finish_reconfigure({
                     CONF_PEOPLE: [*entry.data[CONF_PEOPLE], member]
@@ -348,52 +352,77 @@ class FamilyPresenceOptionsFlow(OptionsFlowWithReload):
                     errors={"base": "invalid_person"},
                 )
             self._selected_person = person_key
-            return await self.async_step_bag_policy()
+            return await self.async_step_bag_schedule()
         return self.async_show_form(
             step_id="bag_person",
             data_schema=vol.Schema({vol.Required("person"): vol.In(choices)}),
         )
 
-    async def async_step_bag_policy(
+    async def async_step_bag_schedule(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """One per-person switch: ALWAYS (strict priority) or LEGACY (YAML)."""
-        current_person = self._selected_person
+        """Configure one event-based ON→OFF window; OFF→ON is anytime."""
+        key = self._selected_person
         people = {
             _person_key(p): p
             for p in self.config_entry.data[CONF_PEOPLE]
             if p.get(CONF_BAG)
         }
-        if current_person not in people:
+        if key not in people:
             return self.async_abort(reason="person_not_found")
-        person = people[current_person]
-        saved = self.config_entry.options.get(CONF_BAG_POLICIES, {})
-        default = saved.get(
-            current_person, person.get(CONF_BAG_POLICY, BagPolicy.ALWAYS.value)
+        person = people[key]
+        options = self.config_entry.options
+        saved = options.get(CONF_BAG_SCHEDULES, {})
+        legacy_policy = options.get(CONF_BAG_POLICIES, {}).get(
+            key, person.get(CONF_BAG_POLICY, "legacy")
+        )
+        schedule = (
+            BagSchedule.from_dict(saved[key])
+            if key in saved else legacy_schedule(legacy_policy)
         )
         if user_input is not None:
-            selection = user_input[CONF_BAG_POLICY]
-            if selection not in (BagPolicy.ALWAYS.value, BagPolicy.LEGACY.value):
+            try:
+                days = tuple(sorted(set(int(day) for day in user_input[CONF_BAG_DAYS])))
+                new_schedule = BagSchedule(
+                    enabled=user_input[CONF_BAG_ENABLED],
+                    start=user_input[CONF_BAG_START],
+                    end=user_input[CONF_BAG_END],
+                    days=days,
+                )
+            except (KeyError, ValueError, TypeError):
                 return self.async_show_form(
-                    step_id="bag_policy",
-                    data_schema=vol.Schema({
-                        vol.Required(CONF_BAG_POLICY, default=default):
-                            vol.In(BAG_POLICY_CHOICES_IT)
-                    }),
-                    errors={CONF_BAG_POLICY: "invalid_policy"},
+                    step_id="bag_schedule",
+                    data_schema=self._bag_schedule_schema(schedule),
+                    errors={"base": "invalid_schedule"},
                 )
             return self.async_create_entry(data={
-                **self.config_entry.options,
-                CONF_BAG_POLICIES: {
-                    **saved,
-                    current_person: selection,
-                },
+                **options,
+                CONF_BAG_SCHEDULES: {**saved, key: new_schedule.to_dict()},
             })
         return self.async_show_form(
-            step_id="bag_policy",
-            data_schema=vol.Schema({
-                vol.Required(CONF_BAG_POLICY, default=default):
-                    vol.In(BAG_POLICY_CHOICES_IT)
-            }),
+            step_id="bag_schedule",
+            data_schema=self._bag_schedule_schema(schedule),
             description_placeholders={"person": person[CONF_PERSON_NAME]},
         )
+
+    @staticmethod
+    def _bag_schedule_schema(schedule: BagSchedule) -> vol.Schema:
+        weekdays = (
+            "Lunedì", "Martedì", "Mercoledì", "Giovedì",
+            "Venerdì", "Sabato", "Domenica",
+        )
+        return vol.Schema({
+            vol.Required(CONF_BAG_ENABLED, default=schedule.enabled): bool,
+            vol.Required(CONF_BAG_START, default=schedule.start): TimeSelector(),
+            vol.Required(CONF_BAG_END, default=schedule.end): TimeSelector(),
+            vol.Required(
+                CONF_BAG_DAYS,
+                default=[str(day) for day in schedule.days],
+            ): SelectSelector(SelectSelectorConfig(
+                options=[
+                    {"value": str(day), "label": name}
+                    for day, name in enumerate(weekdays)
+                ],
+                multiple=True,
+            )),
+        })

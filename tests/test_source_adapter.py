@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from custom_components.family_presence.coordinator import PersonSources, ShadowCoordinator
 from custom_components.family_presence.fsm import BagPolicy, Event, State
+from custom_components.family_presence.bag_schedule import BagSchedule, ALL_DAYS
 
 
 def load_source_module():
@@ -155,7 +156,7 @@ class SourceAdapterTests(unittest.IsolatedAsyncioTestCase):
             "child-id": "legacy",
         }})
         self.assertEqual([p.bag_policy for p in specs],
-                         [BagPolicy.LEGACY, BagPolicy.ALWAYS])
+                         [BagPolicy.LEGACY, BagPolicy.LEGACY])
 
     async def test_legacy_name_based_policy_option_is_supported(self):
         config = {"people": [{"person_name": "Member", "bag_sensor": "bag"}]}
@@ -170,30 +171,41 @@ class SourceAdapterTests(unittest.IsolatedAsyncioTestCase):
                          {"phone", "bag", "watch", "ref", "switch.gate",
                           "binary_sensor.door", "lock.front"})
 
-    async def test_unavailable_to_off_bag_only_reconciles_not_arrives(self):
+    async def test_unavailable_bag_recovery_never_synthesizes_departure_or_arrival(self):
         self.engine.runtime["child"].state = State.HOME
         self.inputs["bag"] = "off"
         self.adapter._changed(ha_event("bag", "unavailable", "off", self.now))
         await self.drain()
-        self.assertEqual(self.engine.state("child"), State.AWAY)
-        self.assertEqual(self.engine.runtime["child"].last_reason, "Bag absent (priority)")
-        # Returning from unavailable to ON is not a physical OFF->ON bag arrival.
+        self.assertEqual(self.engine.state("child"), State.HOME)
         self.inputs["bag"] = "on"
         self.adapter._changed(ha_event("bag", "unavailable", "on", self.now))
         await self.drain()
-        self.assertEqual(self.engine.state("child"), State.AWAY)
-
-    async def test_bag_recovered_on_releases_manual_hold_without_fake_arrival(self):
-        self.inputs["bag"] = "off"
-        self.assertTrue(await self.engine.confirm_home_without_bag("child"))
-        self.assertTrue(self.engine.runtime["child"].manual_home_active)
-        self.inputs["bag"] = "on"
-        self.adapter._changed(ha_event(
-            "bag", "unavailable", "on", self.now,
-        ))
-        await self.drain()
-        self.assertFalse(self.engine.runtime["child"].manual_home_active)
         self.assertEqual(self.engine.state("child"), State.HOME)
+
+    async def test_real_bag_transitions_respect_schedule(self):
+        self.engine.runtime["child"].state = State.HOME
+        self.inputs["bag"] = "off"
+        self.adapter._changed(ha_event("bag", "on", "off", self.now))
+        await self.drain()
+        self.assertEqual(self.engine.state("child"), State.AWAY)
+        self.inputs["bag"] = "on"
+        self.adapter._changed(ha_event("bag", "off", "on", self.now))
+        await self.drain()
+        self.assertEqual(self.engine.state("child"), State.HOME)
+
+    async def test_new_schedule_options_override_migrated_policy_per_person(self):
+        config = {"people": [
+            {"person_name": "Child", "person_id": "child-id",
+             "bag_sensor": "bag", "bag_policy": "always"}
+        ]}
+        options = {"bag_schedules": {
+            "child-id": {"enabled": False, "start": "00:00",
+                         "end": "00:00", "days": list(ALL_DAYS)}
+        }}
+        spec = self.mod._person_specs(config, options)[0]
+        self.assertFalse(spec.bag_schedule.enabled)
+        self.assertEqual(spec.bag_schedule.start, "00:00")
+        self.assertTrue(self.mod._person_specs(config)[0].bag_schedule.includes(self.now))
 
     async def test_unavailable_watch_on_does_not_create_false_arrival(self):
         self.adapter._changed(ha_event("watch", "unknown", "on", self.now))
@@ -218,13 +230,13 @@ class SourceAdapterTests(unittest.IsolatedAsyncioTestCase):
         await self.drain()
         self.assertEqual(engine.state("child"), State.AWAY)
 
-    async def test_neighbor_gate_vetoed_by_absent_bag(self):
+    async def test_gate_and_watch_can_override_prior_bag_absence(self):
         self.inputs["bag"] = "off"
         self.adapter._changed(ha_event("switch.gate", "off", "on", self.now))
         await self.drain()
         self.adapter._changed(ha_event("watch", "off", "on", self.now))
         await self.drain()
-        self.assertEqual(self.engine.state("child"), State.AWAY)
+        self.assertEqual(self.engine.state("child"), State.HOME)
 
     async def test_reference_update_refreshes_diagnostics_not_fsm(self):
         notifications = []

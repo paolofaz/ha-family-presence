@@ -89,6 +89,9 @@ def load_flow():
     selector = types.ModuleType("homeassistant.helpers.selector")
     selector.EntitySelectorConfig = lambda **kwargs: kwargs
     selector.EntitySelector = lambda config: config
+    selector.TimeSelector = lambda: "time_selector"
+    selector.SelectSelectorConfig = lambda **kwargs: kwargs
+    selector.SelectSelector = lambda config: config
 
     modules = {
         "voluptuous": vol,
@@ -171,32 +174,42 @@ class OptionsFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["step_id"], "bag_policy")
         self.assertEqual(result["description_placeholders"]["person"], "Child")
 
-    async def test_bag_policy_choices_have_clear_italian_labels(self):
+    async def test_schedule_form_shows_enabled_hours_and_weekdays(self):
         flow = self.new()
         await flow.async_step_bag_person({"person": "child-id"})
-        form = await flow.async_step_bag_policy()
-        self.assertEqual(
-            form["schema"]["bag_policy"],
-            {
-                "always": "Priorità assoluta",
-                "legacy": "Fascia scolastica (lun–ven 07:00–09:10)",
-            },
-        )
+        form = await flow.async_step_bag_schedule()
+        self.assertEqual(form["step_id"], "bag_schedule")
+        self.assertEqual(set(form["schema"]), {"enabled", "start", "end", "days"})
 
-    async def test_bag_policy_updates_only_selected_person(self):
+    async def test_schedule_update_preserves_other_options_and_persons(self):
         flow = self.new()
         await flow.async_step_bag_person({"person": "child-id"})
-        result = await flow.async_step_bag_policy({"bag_policy": "always"})
+        result = await flow.async_step_bag_schedule({
+            "enabled": True, "start": "00:00", "end": "00:00",
+            "days": ["0", "1", "2", "3", "4", "5", "6"],
+        })
         self.assertEqual(result["type"], "create_entry")
-        self.assertEqual(result["data"]["bag_policies"], {"child-id": "always"})
         self.assertEqual(result["data"]["entry_gate_seconds"], 123)
-        self.assertEqual(self.options["bag_policies"]["child-id"], "legacy")
+        self.assertEqual(result["data"]["bag_policies"], {"child-id": "legacy"})
+        entry = result["data"]["bag_schedules"]["child-id"]
+        self.assertEqual(entry["start"], "00:00")
+        self.assertEqual(entry["end"], "00:00")
+        self.assertEqual(entry["days"], list(range(7)))
+
+    async def test_schedule_can_disable_backpack(self):
+        flow = self.new()
+        await flow.async_step_bag_person({"person": "child-id"})
+        result = await flow.async_step_bag_schedule({
+            "enabled": False, "start": "07:00",
+            "end": "09:10", "days": ["0", "1", "2", "3", "4"],
+        })
+        self.assertFalse(result["data"]["bag_schedules"]["child-id"]["enabled"])
 
     async def test_cannot_edit_person_without_bag(self):
         flow = self.new()
         result = await flow.async_step_bag_person({"person": "adult-id"})
         self.assertEqual(result["errors"]["base"], "invalid_person")
-        self.assertEqual((await flow.async_step_bag_policy())["type"], "abort")
+        self.assertEqual((await flow.async_step_bag_schedule())["type"], "abort")
 
     async def test_legacy_name_based_entries_are_still_editable(self):
         person = {"person_name": "Member", "bag_sensor": "binary_sensor.zaino"}
@@ -204,8 +217,11 @@ class OptionsFlowTests(unittest.IsolatedAsyncioTestCase):
         selection = await flow.async_step_bag_person()
         self.assertEqual(selection["schema"]["person"], {"member": "Member"})
         await flow.async_step_bag_person({"person": "member"})
-        result = await flow.async_step_bag_policy({"bag_policy": "legacy"})
-        self.assertEqual(result["data"]["bag_policies"], {"member": "legacy"})
+        result = await flow.async_step_bag_schedule({
+            "enabled": True, "start": "07:00", "end": "09:10",
+            "days": ["0", "1", "2", "3", "4"],
+        })
+        self.assertEqual(result["data"]["bag_schedules"]["member"]["days"], [0, 1, 2, 3, 4])
 
 
 if __name__ == "__main__":

@@ -93,52 +93,44 @@ class ManualButtonsTests(unittest.IsolatedAsyncioTestCase):
             lambda items: self.entities.extend(items),
         )
 
-    async def test_only_strict_bag_people_get_controls(self):
-        self.assertEqual(len(self.entities), 2)
+    async def test_all_members_receive_force_home_and_away(self):
+        self.assertEqual(len(self.entities), 6)
         self.assertEqual(
-            {entity.action for entity in self.entities},
-            {"confirm_home", "revoke"},
+            {(e.person, e.target) for e in self.entities},
+            {(person, state) for person in ("kid", "adult", "legacy")
+             for state in (State.HOME, State.AWAY)},
         )
-        self.assertTrue(all(e.person == "kid" for e in self.entities))
-        self.assertEqual(self.entities[0]._attr_entity_category, "diagnostic")
+        self.assertTrue(all(e._attr_entity_category == "diagnostic" for e in self.entities))
 
-    async def test_actions_are_explicit_and_persist_immediately(self):
-        home = next(x for x in self.entities if x.action == "confirm_home")
-        revoke = next(x for x in self.entities if x.action == "revoke")
-        self.assertIn("Shadow", home._attr_name)
-        self.assertTrue(home.available)
-        self.assertFalse(revoke.available)
+    async def test_force_actions_persist_immediately(self):
+        home = next(e for e in self.entities
+                    if e.person == "kid" and e.target == State.HOME)
+        away = next(e for e in self.entities
+                    if e.person == "kid" and e.target == State.AWAY)
+        self.assertIn("Forza a casa", home._attr_name)
+        self.assertIn("Forza fuori casa", away._attr_name)
         await home.async_press()
         self.assertEqual(self.engine.state("kid"), State.HOME)
-        self.assertTrue(self.engine.runtime["kid"].manual_home_active)
-        self.assertFalse(home.available)
-        self.assertTrue(revoke.available)
         self.assertEqual(len(self.store.saved), 1)
-        self.assertTrue(
-            self.store.saved[0]["people"]["kid"]["manual_home"]["active"]
+        self.assertEqual(
+            self.store.saved[0]["people"]["kid"]["manual"]["last_action"],
+            "manual_home",
         )
-        await revoke.async_press()
-        self.assertIsNone(self.engine.state("kid"))
+        self.now = self.now.replace(minute=1)
+        await away.async_press()
+        self.assertEqual(self.engine.state("kid"), State.AWAY)
         self.assertEqual(len(self.store.saved), 2)
-        self.assertTrue(
-            self.store.saved[1]["people"]["kid"]["manual_home"]["post_manual_ambiguity"]
+        self.assertEqual(
+            self.store.saved[1]["people"]["kid"]["manual"]["last_action"],
+            "manual_away",
         )
 
-    async def test_invalid_press_has_no_effect_or_storage_write(self):
-        home = next(x for x in self.entities if x.action == "confirm_home")
-        self.data["bag"] = "on"
-        self.assertFalse(home.available)
+    async def test_person_without_backpack_can_use_both_buttons(self):
+        home = next(e for e in self.entities
+                    if e.person == "adult" and e.target == State.HOME)
         await home.async_press()
-        self.assertEqual(len(self.store.saved), 0)
-        self.assertIsNone(self.engine.state("kid"))
+        self.assertEqual(self.engine.state("adult"), State.HOME)
 
-    async def test_button_receives_entity_updates(self):
-        home = next(x for x in self.entities if x.action == "confirm_home")
-        await home.async_added_to_hass()
-        self.engine.notify_source_update("kid")
-        self.assertTrue(home._wrote_state)
-        home._unsubscribe()
-        self.assertFalse(self.engine._listeners)
 
 
 if __name__ == "__main__":

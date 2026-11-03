@@ -8,6 +8,7 @@ from custom_components.family_presence.coordinator import (
     PersonSources, ShadowCoordinator, bag_status, parse_state,
 )
 from custom_components.family_presence.fsm import BagPolicy, BagStatus, Event, State
+from custom_components.family_presence.bag_schedule import legacy_schedule
 
 
 class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
@@ -24,6 +25,7 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
         specs = people or [PersonSources(
             key="child", name="Child", iphone="phone", watch="watch",
             bag="bag", reference=reference, bag_policy=policy,
+            bag_schedule=legacy_schedule(policy.value),
         )]
         coordinator = ShadowCoordinator(
             specs,
@@ -59,15 +61,15 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
         readings["ref"] = "home"
         self.assertEqual(engine.state("test"), State.AWAY)
 
-    async def test_bag_absent_wins_over_neighbor_gate_and_watch(self):
+    async def test_bag_absent_does_not_override_later_phone_or_watch(self):
         c = self.engine()
         c.record_physical("gate", self.now - timedelta(seconds=5))
-        await c.process("child", Event.WATCH_SEEN, event_time=self.now)
+        result = await c.process("child", Event.WATCH_SEEN, event_time=self.now)
+        self.assertEqual(result.current, State.HOME)
+        await c.process("child", Event.IPHONE_LEFT, event_time=self.now)
         self.assertEqual(c.state("child"), State.AWAY)
-        self.assertEqual(c.runtime["child"].last_blocked_event, Event.WATCH_SEEN)
-        await c.process("child", Event.IPHONE_ARRIVED, event_time=self.now)
-        self.assertEqual(c.state("child"), State.AWAY)
-
+        result = await c.process("child", Event.IPHONE_ARRIVED, event_time=self.now)
+        self.assertEqual(result.current, State.HOME)
     async def test_bag_arrived_goes_home_but_presence_does_not_stay_locked(self):
         c = self.engine()
         self.inputs["bag"] = "on"
@@ -76,19 +78,12 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
         d = await c.process("child", Event.IPHONE_LEFT, event_time=self.now)
         self.assertEqual(d.current, State.AWAY)
 
-    async def test_bag_absent_reconcile_after_restart(self):
+    async def test_restart_with_bag_off_does_not_synthesize_exit(self):
         self.inputs.pop("ref")
         c = self.engine()
         self.assertIsNone(c.state("child"))
-        decisions = await c.reconcile()
-        self.assertEqual(len(decisions), 1)
-        self.assertEqual(c.state("child"), State.AWAY)
-        self.assertEqual(decisions[0].reason, "Bag absent (priority)")
-        self.inputs["bag"] = "unavailable"
-        c2 = self.engine()
-        self.assertEqual(await c2.reconcile(), [])
-        self.assertIsNone(c2.state("child"))
-
+        self.assertEqual(await c.reconcile(), [])
+        self.assertIsNone(c.state("child"))
     async def test_unknown_bag_does_not_veto_entry(self):
         self.inputs.update({"bag": "unavailable", "phone": "home"})
         c = self.engine()
@@ -115,10 +110,9 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(await c.process("child", Event.WATCH_LOST, event_time=self.now))
         self.assertEqual(c.state("child"), State.HOME)
 
-    async def test_legacy_departure_uses_local_school_window(self):
+    async def test_bag_departure_uses_configured_local_window(self):
         self.inputs["ref"] = "home"
         c = self.engine(policy=BagPolicy.LEGACY)
-        # 08:00 UTC = 09:00 Europe/Rome in November.
         self.assertEqual(
             (await c.process("child", Event.BAG_LEFT, event_time=self.now)).current,
             State.AWAY,
@@ -127,7 +121,6 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
         c2 = self.engine(policy=BagPolicy.LEGACY)
         self.assertIsNone(await c2.process("child", Event.BAG_LEFT, event_time=self.now))
         self.assertEqual(c2.state("child"), State.HOME)
-
     async def test_newer_bag_update_cancels_pending_watch_on(self):
         started, release = asyncio.Event(), asyncio.Event()
 

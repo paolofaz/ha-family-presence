@@ -24,6 +24,8 @@ class Event(StrEnum):
     BAG_ARRIVED = "bag_arrived"
     BAG_LEFT = "bag_left"
     RECONCILE = "reconcile"
+    MANUAL_HOME = "manual_home"
+    MANUAL_AWAY = "manual_away"
 
 
 class BagStatus(StrEnum):
@@ -53,7 +55,9 @@ class Evidence:
     gate_entry: bool = False
     watch_detected: bool = False
     physical_event_label: str = "physical event"
-    school_bag_window: bool = False
+    bag_departure_active: bool = False
+    bag_enabled: bool = True
+    school_bag_window: bool = False  # Compatibility only for old test fixtures
     bag_status: BagStatus = BagStatus.NOT_CONFIGURED
 
 
@@ -69,18 +73,17 @@ def decide(
     event: Event,
     evidence: Evidence = Evidence(),
     *,
-    bag_policy: BagPolicy = BagPolicy.ALWAYS,
+    bag_policy: BagPolicy = BagPolicy.ALWAYS,  # Migration-only compatibility; ignored
 ) -> Decision | None:
-    """Decide atomically. Confirmed bag absence wins before every other rule.
+    """An ON→OFF bag transition has priority only when it occurs in-window.
 
-    ALWAYS: with the bag sensor currently OFF, force AWAY and suppress all
-    conflicting input events until the bag is ON again. The caller must
-    normalize OFF/ON/unknown/unavailable and serialize decisions per person.
-    LEGACY: original morning-only bag departure, with no persistent veto.
+    No permanent bag-OFF veto exists. The next valid event from any source
+    may update the person. Manual buttons are one-off state-setting events.
     """
-    if bag_policy == BagPolicy.ALWAYS and evidence.bag_status == BagStatus.ABSENT:
-        return Decision(State.AWAY, "Bag absent (priority)") if current != State.AWAY else None
-
+    if event == Event.MANUAL_HOME:
+        return Decision(State.HOME, "Forzato in casa manualmente")
+    if event == Event.MANUAL_AWAY:
+        return Decision(State.AWAY, "Forzato fuori casa manualmente")
     if event == Event.RECONCILE:
         return None
 
@@ -123,9 +126,9 @@ def decide(
         return None
 
     # Existing YAML updates reason even if already in the resulting state.
-    if event == Event.BAG_ARRIVED:
+    if event == Event.BAG_ARRIVED and evidence.bag_enabled:
         return Decision(State.HOME, "Bag arrived")
-    if event == Event.BAG_LEFT and evidence.school_bag_window:
+    if event == Event.BAG_LEFT and evidence.bag_enabled and evidence.bag_departure_active:
         return Decision(State.AWAY, "Bag left")
     return None
 

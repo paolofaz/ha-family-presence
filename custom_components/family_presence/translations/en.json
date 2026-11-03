@@ -15,13 +15,12 @@
       },
       "person": {
         "title": "Household member",
-        "description": "Map at least one source. The old YAML helper is optional and used only to compare states.",
+        "description": "Map presence sources. Configure the backpack time window after installation. Legacy YAML is only for comparison.",
         "data": {
           "person_name": "Person name",
           "iphone_tracker": "Phone tracker (optional)",
           "watch_sensor": "BLE wearable sensor (optional)",
           "bag_sensor": "Bag sensor (optional)",
-          "bag_policy": "Backpack rule (absolute priority / school-hours)",
           "legacy_presence_entity": "Previous YAML FSM state (optional, comparison ONLY)"
         }
       },
@@ -106,7 +105,7 @@
         "title": "Family Presence settings",
         "menu_options": {
           "windows": "Event correlation windows",
-          "bag_person": "Backpack priority policies"
+          "bag_person": "Backpack time windows"
         }
       },
       "windows": {
@@ -122,23 +121,27 @@
         }
       },
       "bag_person": {
-        "title": "Choose a person",
+        "title": "Choose member for backpack schedule",
         "description": "Select the household member whose backpack rule you want to change.",
         "data": {
           "person": "Household member"
         }
       },
-      "bag_policy": {
-        "title": "Backpack rule",
-        "description": "Choose the backpack rule for {person}. Absolute priority: absent bag forces away at any time. School-hours: bag exit matters only Monday–Friday, 07:00–09:10. A present bag never locks home.",
+      "bag_schedule": {
+        "title": "Backpack time window",
+        "description": "Choose {person}'s backpack hours and weekdays. ON→OFF causes Away only inside the window. OFF→ON causes Home anytime. Disabled ignores both. Equal start/end times (e.g. 00:00–00:00) mean all 24 hours.",
         "data": {
-          "bag_policy": "Behavior"
+          "enabled": "Enable backpack",
+          "start": "Start time",
+          "end": "End time",
+          "days": "Active weekdays"
         }
       }
     },
     "error": {
       "invalid_person": "Person not available.",
-      "invalid_policy": "Invalid backpack policy."
+      "invalid_policy": "Invalid backpack policy.",
+      "invalid_schedule": "Invalid backpack schedule."
     },
     "abort": {
       "person_not_found": "The person is no longer available or has no configured backpack."

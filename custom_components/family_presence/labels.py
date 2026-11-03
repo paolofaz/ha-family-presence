@@ -16,7 +16,7 @@ BAG_POLICY_CHOICES_IT = {
 _REASON_IT = {
     "Bag absent (priority)": "Zaino assente: priorità assoluta",
     "Bag arrived": "Zaino rientrato",
-    "Bag left": "Zaino uscito nella fascia scolastica",
+    "Bag left": "Zaino uscito nella fascia configurata",
     "iPhone left home zone": "iPhone uscito dalla zona casa",
     "iPhone entered home zone": "iPhone entrato nella zona casa",
     "iPhone outside": "iPhone fuori dalla zona casa",

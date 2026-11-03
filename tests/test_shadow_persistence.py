@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from custom_components.family_presence.coordinator import PersonSources, ShadowCoordinator
 from custom_components.family_presence.fsm import BagPolicy, Event, State
+from custom_components.family_presence.bag_schedule import BagSchedule, ALL_DAYS
 
 
 class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
@@ -19,11 +20,12 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.sleep = instant_delay
 
     def new(self, *, iphone="phone", reference="reference",
-            bag_policy=BagPolicy.ALWAYS):
+            bag_policy=BagPolicy.ALWAYS, bag_schedule=BagSchedule()):
         return ShadowCoordinator(
             [PersonSources(
                 key="child", name="Child", iphone=iphone, watch="watch",
                 bag="bag", reference=reference, bag_policy=bag_policy,
+                bag_schedule=bag_schedule,
             )],
             read_state=self.values.get,
             clock=lambda: self.time,
@@ -52,7 +54,7 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         first = await self.outside()
         snapshot = first.snapshot()
         original_time = first.runtime["child"].last_changed
-        self.assertEqual(snapshot["format"], 3)
+        self.assertEqual(snapshot["format"], 4)
         self.values["reference"] = "home"  # YAML DISAGREES.
         restarted = self.new()
         self.assertIsNone(restarted.state("child"))
@@ -78,12 +80,12 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(next_run.state("child"), State.AWAY)
             self.assertEqual(next_run.runtime["child"].last_reason, "iPhone left home zone")
             saved = next_run.snapshot()
-        self.assertEqual(saved["format"], 3)
+        self.assertEqual(saved["format"], 4)
 
     async def test_changing_only_comparison_helper_preserves_new_format(self):
         first = await self.outside()
         saved = first.snapshot()
-        self.assertEqual(saved["format"], 3)
+        self.assertEqual(saved["format"], 4)
         other_reference = self.new(reference="another_ref")
         self.assertEqual(other_reference.restore_snapshot(saved), 1)
         self.assertEqual(other_reference.state("child"), State.AWAY)
@@ -101,7 +103,7 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(upgraded.restore_snapshot(saved), 1)
         self.assertEqual(upgraded.state("child"), State.AWAY)
         self.assertEqual(upgraded.runtime["child"].last_reason, "iPhone left home zone")
-        self.assertEqual(upgraded.snapshot()["format"], 3)
+        self.assertEqual(upgraded.snapshot()["format"], 4)
 
     async def test_changed_source_or_priority_rejects_stale_snapshot(self):
         first = await self.outside()
@@ -109,9 +111,11 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         new_source = self.new(iphone="new_phone")
         self.assertEqual(new_source.restore_snapshot(saved), 0)
         self.assertIsNone(new_source.state("child"))
-        new_policy = self.new(bag_policy=BagPolicy.LEGACY)
-        self.assertEqual(new_policy.restore_snapshot(saved), 0)
-        self.assertIsNone(new_policy.state("child"))
+        new_schedule = self.new(bag_schedule=BagSchedule(
+            True, "00:00", "00:00", ALL_DAYS,
+        ))
+        self.assertEqual(new_schedule.restore_snapshot(saved), 0)
+        self.assertIsNone(new_schedule.state("child"))
 
     async def test_stale_snapshot_cannot_make_all_away_true(self):
         initial = await self.outside()
@@ -124,7 +128,7 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(restored.all_away())
         self.values["phone"] = "home"
         await restored.process("child", Event.IPHONE_ARRIVED, event_time=self.time)
-        self.assertIsNone(restored.all_away())  # Bag veto blocks false HOME.
+        self.assertIs(restored.all_away(), False)  # A new phone arrival wins over bag OFF.
         self.values["bag"] = "on"
         await restored.process("child", Event.BAG_ARRIVED, event_time=self.time)
         self.assertIs(restored.all_away(), False)
@@ -207,7 +211,7 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         serialized = str(snapshot)
         for secret in ("last_seen", "rssi", "irk", "another_ref", "phone_value"):
             self.assertNotIn(secret, serialized)
-        self.assertEqual(snapshot["format"], 3)
+        self.assertEqual(snapshot["format"], 4)
 
 
 if __name__ == "__main__":
