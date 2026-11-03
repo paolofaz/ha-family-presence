@@ -158,25 +158,25 @@ class ShadowSensorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(registered), 2)
         household = next(x for x in registered
                          if isinstance(x, module.ShadowHouseholdSensor))
-        self.assertEqual(household.native_value, "indeterminate")
+        self.assertEqual(household.native_value, "incomplete")
         attrs = household.extra_state_attributes
         self.assertEqual(attrs["mode"], "shadow_only")
         self.assertTrue(attrs["do_not_use_for_automations"])
-        self.assertTrue(attrs["candidate_empty_is_not_alarm_permission"])
+        self.assertTrue(attrs["not_a_production_alarm_entity"])
         self.assertIn("Member", attrs["unresolved_members"])
-        self.assertIsNone(attrs["all_away_internal"])
+        self.assertIs(attrs["all_away_internal"], False)
 
         await engine.force_state("person", State.AWAY)
         attrs = household.extra_state_attributes
         self.assertEqual(household.native_value, "indeterminate")
         self.assertEqual(attrs["member_diagnostics"]["Member"]["reason"],
                          "away_manuale_non_verificato")
-        self.assertIsNone(attrs["all_away_internal"])
+        self.assertIs(attrs["all_away_internal"], False)
 
         self.s["phone"] = "not_home"
         self.now += timedelta(seconds=2)  # New sensor event must follow manual force.
         await engine.process("person", Event.IPHONE_LEFT, event_time=self.now)
-        self.assertEqual(household.native_value, "candidate_empty")
+        self.assertEqual(household.native_value, "all_away")
         self.assertIs(household.extra_state_attributes["all_away_internal"], True)
 
     async def test_diagnostic_reports_missing_reason_instead_of_inventing_it(self):
