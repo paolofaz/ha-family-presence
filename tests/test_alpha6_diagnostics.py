@@ -32,6 +32,8 @@ class Alpha6DiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rt.last_ignored_event, Event.BAG_LEFT)
         self.assertIn("fuori dalla fascia", rt.last_ignored_reason)
         self.assertEqual(rt.ignored_count, 1)
+        self.assertEqual(len(rt.recent_events), 1)
+        self.assertEqual(rt.recent_events[0]["outcome"], "ignored")
 
     async def test_disabled_bag_explains_both_events_without_changing_presence(self):
         schedule = BagSchedule(False, "00:00", "00:00", ALL_DAYS)
@@ -41,6 +43,16 @@ class Alpha6DiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         await engine.process("child", Event.BAG_ARRIVED, event_time=self.now)
         self.assertEqual(engine.state("child"), State.AWAY)
         self.assertIn("disabilitato", engine.runtime["child"].last_ignored_reason)
+
+    async def test_recent_events_are_bounded_and_never_control_state(self):
+        engine = self.new()
+        engine.runtime["child"].state = State.HOME
+        for i in range(20):
+            self.now += timedelta(seconds=1)
+            await engine.process("child", Event.BAG_LEFT, event_time=self.now)
+        self.assertEqual(len(engine.runtime["child"].recent_events), 12)
+        self.assertEqual(engine.runtime["child"].ignored_count, 20)
+        self.assertEqual(engine.state("child"), State.HOME)
 
     async def test_mismatch_tracks_legacy_changes_and_resolves(self):
         engine = self.new()
@@ -74,6 +86,8 @@ class Alpha6DiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(second.state("child"), State.HOME)
         self.assertEqual(second.runtime["child"].last_ignored_event, Event.BAG_LEFT)
         self.assertEqual(second.runtime["child"].ignored_count, 1)
+        self.assertEqual([ev["outcome"] for ev in second.runtime["child"].recent_events],
+                         ["ignored", "applied"])
         await second.reconcile()
         self.assertEqual(second.state("child"), State.HOME)
 
