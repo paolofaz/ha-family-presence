@@ -15,10 +15,11 @@ async def async_setup_entry(
 ) -> None:
     """Expose one diagnostically marked shadow sensor per configured person."""
     engine = entry.runtime_data.engine
-    async_add_entities(
-        ShadowPersonSensor(entry.entry_id, engine, person_id)
-        for person_id in engine.people
-    )
+    async_add_entities([
+        *(ShadowPersonSensor(entry.entry_id, engine, person_id)
+          for person_id in engine.people),
+        ShadowHouseholdSensor(entry.entry_id, engine),
+    ])
 
 
 class ShadowPersonSensor(SensorEntity):
@@ -99,3 +100,55 @@ class ShadowPersonSensor(SensorEntity):
     def _shadow_updated(self, person: str) -> None:
         if person == self.person:
             self.async_write_ha_state()
+
+
+class ShadowHouseholdSensor(SensorEntity):
+    """Explanatory candidate, NOT an occupancy or alarm automation trigger."""
+
+    _attr_should_poll = False
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:home-search-outline"
+
+    def __init__(self, entry_id: str, engine: ShadowCoordinator) -> None:
+        self.engine = engine
+        self._attr_unique_id = f"{entry_id}_household_readiness_shadow"
+        self._attr_name = "Family Presence Shadow - Diagnostica casa"
+
+    @property
+    def native_value(self) -> str:
+        return self.engine.household_assessment().status
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        assessment = self.engine.household_assessment()
+        return {
+            "mode": "shadow_only",
+            "do_not_use_for_automations": True,
+            "candidate_empty_is_not_alarm_permission": True,
+            "all_away_internal": self.engine.all_away(),
+            "member_diagnostics": {
+                self.engine.people[key].name: {
+                    "state": self.engine.state(key).value
+                    if self.engine.state(key) is not None else None,
+                    "reason": reason,
+                }
+                for key, reason in assessment.reasons.items()
+            },
+            "presence_indicated_members": [
+                self.engine.people[key].name for key in assessment.indicated_present
+            ],
+            "unresolved_members": [
+                self.engine.people[key].name for key in assessment.unresolved
+            ],
+            "divergent_members": [
+                self.engine.people[key].name for key in assessment.divergent
+            ],
+        }
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(self.engine.async_add_listener(self._updated))
+
+    @callback
+    def _updated(self, _person: str) -> None:
+        self.async_write_ha_state()
