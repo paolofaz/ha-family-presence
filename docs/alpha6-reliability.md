@@ -31,6 +31,12 @@ Examples: bag OFF outside the departure window, disabled bag, stale source
 callback, Watch transition without adequate evidence, unknown/unavailable bag
 sensor recovery. Rejected input never updates the person's presence.
 
+## Bounded decision log
+The diagnostic attribute `recent_events` exposes the last 12 accepted or
+ignored transitions with their event name, outcome, event time, state and
+reason. The scrubbed list is stored with snapshot format 5. It is never
+replayed to set presence on restart.
+
 ## Comparison diagnostics
 New `comparison_status` attribute: `aligned`, `diverged`, `unknown`, or
 `not_configured`. New `divergence_since` records the start of a continuous
