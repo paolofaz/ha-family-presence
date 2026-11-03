@@ -1,9 +1,9 @@
 """Read-only parity report between shadow FSM and configured legacy helpers.
 
-The existing YAML's Casa certamente vuota template is the AND of four
-`input_select.presenza_*` states equalling `away`. This module applies the
-equivalent rule to *configured comparison helpers* only. It never reads
-or writes the production binary sensor, and cannot affect shadow decisions.
+The old Casa certamente vuota template is the AND of per-person legacy
+input_select values equalling `away`. We can also optionally observe the
+actual old binary sensor as a separate, strictly read-only validation. It
+never influences the new FSM or the reconstructed expected result.
 """
 from __future__ import annotations
 
@@ -28,6 +28,10 @@ class LegacyComparison:
     differing_members: tuple[str, ...]
     missing_reference_members: tuple[str, ...]
     unavailable_reference_members: tuple[str, ...]
+    actual_legacy_state: str | None
+    actual_legacy_all_away: bool | None
+    actual_legacy_matches_expected: bool | None
+    actual_legacy_matches_shadow: bool | None
 
 
 def compare_legacy(engine: ShadowCoordinator) -> LegacyComparison:
@@ -77,6 +81,18 @@ def compare_legacy(engine: ShadowCoordinator) -> LegacyComparison:
         else:
             status = "aligned"
 
+    # The live YAML sensor can lag its input_select template. Report that
+    # independently: it must never veto or correct the authoritative FSM.
+    actual = engine._read(engine.legacy_aggregate) if engine.legacy_aggregate else None
+    actual_boolean = True if actual == "on" else False if actual == "off" else None
+    actual_expected = (
+        actual_boolean == legacy_expected
+        if actual_boolean is not None and legacy_expected is not None else None
+    )
+    actual_shadow = (
+        actual_boolean == shadow_all_away
+        if actual_boolean is not None else None
+    )
     return LegacyComparison(
         status=status,
         shadow_all_away=shadow_all_away,
@@ -86,4 +102,8 @@ def compare_legacy(engine: ShadowCoordinator) -> LegacyComparison:
         differing_members=tuple(differing),
         missing_reference_members=tuple(missing),
         unavailable_reference_members=tuple(unavailable),
+        actual_legacy_state=actual,
+        actual_legacy_all_away=actual_boolean,
+        actual_legacy_matches_expected=actual_expected,
+        actual_legacy_matches_shadow=actual_shadow,
     )

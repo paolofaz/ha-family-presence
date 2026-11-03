@@ -4,13 +4,14 @@
     "step": {
       "user": {
         "title": "Abitazione",
-        "description": "Seleziona i sensori comuni. Questa versione non modifica ancora gli stati.",
+        "description": "Seleziona i sensori comuni. La beta rimane in modalità ombra: nessun comando all'allarme.",
         "data": {
           "household_name": "Nome abitazione",
           "gate_entities": "Sensori cancello (facoltativi)",
           "door_contact": "Contatto porta (facoltativo)",
           "door_lock": "Serratura (facoltativa)",
-          "alarm": "Allarme (facoltativo)"
+          "alarm": "Allarme (facoltativo)",
+          "legacy_all_away_binary": "Casa certamente vuota YAML (solo confronto, facoltativo)"
         }
       },
       "person": {
@@ -47,7 +48,8 @@
           "gate_entities": "Sensori cancello (facoltativi)",
           "door_contact": "Contatto porta (facoltativo)",
           "door_lock": "Serratura (facoltativa)",
-          "alarm": "Allarme (facoltativo)"
+          "alarm": "Allarme (facoltativo)",
+          "legacy_all_away_binary": "Casa certamente vuota YAML (solo confronto, facoltativo)"
         }
       },
       "reconfigure_choose": {

@@ -131,6 +131,10 @@ class ShadowHouseholdSensor(SensorEntity):
             "legacy_comparison_status": comparison.status,
             "legacy_expected_all_away": comparison.legacy_expected_all_away,
             "aggregate_matches_legacy": comparison.aggregate_matches_legacy,
+            "actual_legacy_state": comparison.actual_legacy_state,
+            "actual_legacy_all_away": comparison.actual_legacy_all_away,
+            "actual_legacy_matches_expected": comparison.actual_legacy_matches_expected,
+            "actual_legacy_matches_shadow": comparison.actual_legacy_matches_shadow,
             "legacy_divergence_since": (
                 self.engine.parity_diverged_since.isoformat()
                 if self.engine.parity_diverged_since else None

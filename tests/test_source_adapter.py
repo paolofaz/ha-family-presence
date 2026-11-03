@@ -251,6 +251,32 @@ class SourceAdapterTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(self.engine.parity_diverged_since)
         self.assertIn("child", notifications)
 
+    async def test_direct_legacy_binary_change_updates_only_diagnostics(self):
+        await self.adapter.async_stop()
+        self.inputs["old_casa_vuota"] = "off"
+        self.engine.legacy_aggregate = "old_casa_vuota"
+        self.adapter = self.mod.ShadowSourceAdapter(
+            self.hass,
+            {"gate_entities": [], "door_contact": None, "door_lock": None},
+            self.engine,
+        )
+        self.adapter.start()
+        entities, _ = self.events.callbacks[-1]
+        self.assertIn("old_casa_vuota", entities)
+        old_state = self.engine.state("child")
+        observed = []
+        self.engine.async_add_listener(observed.append)
+
+        self.inputs["old_casa_vuota"] = "on"
+        self.adapter._changed(ha_event(
+            "old_casa_vuota", "off", "on", self.now,
+        ))
+        await self.drain()
+        self.assertEqual(self.engine.state("child"), old_state)
+        self.assertIs(self.engine.legacy_comparison().actual_legacy_all_away, True)
+        self.assertIs(self.engine.legacy_comparison().actual_legacy_matches_shadow, True)
+        self.assertIn("child", observed)
+
     async def test_bag_recovery_is_diagnostic_but_not_a_physical_arrival(self):
         self.inputs["bag"] = "on"
         self.adapter._changed(ha_event("bag", "unknown", "on", self.now))

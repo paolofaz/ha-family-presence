@@ -5,7 +5,7 @@ Sources: phone tracker, Watch BLE, optional bag BLE sensor and shared
 gate/door/lock/alarm evidence. The original private family YAML is **not**
 included in this repository.
 
-> **Experimental Alpha 9 (0.1.0a9), shadow-only.** Do not disable the existing
+> **Beta 1 (0.1.0b1), shadow-only field-test.** Do not disable the existing
 > YAML presence, alarm, heating or notification automations. Diagnostic states
 > and manual buttons here do not write the original YAML helpers or operate
 > alarms, heating or locks.
@@ -105,6 +105,23 @@ This comparison is strictly **diagnostic**. FSM transitions and the
 authoritative **all members away = on**, including force buttons, are
 unchanged.
 
+### Beta 1: direct parity with live YAML empty-home binary
+
+Optional configuration in **Reconfigure → Shared household sensors**:
+map the legacy `binary_sensor.casa_certamente_vuota`. The beta observes
+the **actual** YAML binary in addition to rebuilding its expected result from
+all mapped legacy person helpers. New read-only attributes:
+`actual_legacy_state`, `actual_legacy_all_away`,
+`actual_legacy_matches_expected` and
+`actual_legacy_matches_shadow`. This helps distinguish a difference in
+the two FSMs from delayed or unavailable YAML-template updates. Mapping is
+optional; neither the old template nor the old member helpers are ever written.
+
+The exact `all members away = on` rule, including manual overrides, is
+unchanged. All integration outputs remain **shadow**. Use the
+[Italian Beta 1 field test](docs/beta1-field-test.md) for every family member
+before attempting any final cutover.
+
 ### Manual state forcing: one-off, not a hold
 
 For **each person**, two **diagnostic buttons** appear:
@@ -121,8 +138,7 @@ independent shadow state. These buttons do **not** control the alarm or YAML.
 ## Setup and diagnostics
 
 1. Leave the original YAML package and all related automations running.
-2. Install the Alpha 9 prerelease from the development branch when tagged and
-   available through HACS; restart Home Assistant.
+2. Install the Beta 1 (v0.1.0b1) prerelease via HACS; restart Home Assistant.
 3. Add **Family Presence** under Settings → Devices & Services, and map your
    phone, Watch, optional bag, gate, door, lock and armed-away alarm entities.
 4. Optionally map the original YAML `input_select` for **comparison only**.
@@ -141,8 +157,8 @@ For more detail, enable INFO logs under
 `custom_components.family_presence`. All FSM decisions are calculated and
 saved independently of the legacy YAML, and compatible snapshots are restored
 after restart (marked `restored_from_storage`). Shared physical-event
-timestamps are not restored. A stored AWAY is not automatically trusted as
-certain absence.
+timestamps are not restored. A stored AWAY remains authoritative for the exact state-based all-away
+aggregate, while its restored provenance stays visible in diagnostics.
 
 ## Safety / what's next
 
@@ -157,6 +173,7 @@ See [Architecture](docs/architecture.md), [Backpack transitions](docs/bag-policy
 [Alpha 6 field test](docs/alpha6-reliability.md),\n[Alpha 7 history](docs/alpha7-household-safety.md),
 [Alpha 8 authoritative aggregate](docs/alpha8-aggregate.md),
 [Alpha 9 parity diagnostics](docs/alpha9-legacy-parity.md),
+[Beta 1 complete field test](docs/beta1-field-test.md),
 [Shadow test plan](docs/shadow-test-plan.md) and
 [GitHub PR #1](https://github.com/paolofaz/ha-family-presence/pull/1).
 

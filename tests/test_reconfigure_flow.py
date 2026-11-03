@@ -60,6 +60,25 @@ class ReconfigureFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.flow._unique_id, "household")
         self.assertTrue(self.flow._checked_unique_id)
 
+    async def test_read_only_legacy_binary_can_be_configured_or_cleared(self):
+        schema = (await self.flow.async_step_reconfigure_shared())["schema"]
+        self.assertIn("legacy_all_away_binary", schema)
+        out = await self.flow.async_step_reconfigure_shared({
+            "household_name": "Household",
+            "legacy_all_away_binary": "binary_sensor.casa_certamente_vuota",
+        })
+        self.assertTrue(out["reloaded"])
+        self.assertEqual(
+            self.entry.data["legacy_all_away_binary"],
+            "binary_sensor.casa_certamente_vuota",
+        )
+        out = await self.flow.async_step_reconfigure_shared({
+            "household_name": "Household",
+        })
+        self.assertTrue(out["reloaded"])
+        self.assertIsNone(self.entry.data["legacy_all_away_binary"])
+        self.assertEqual(self.entry.data["people"], self.members)
+
     async def test_name_change_preserves_immutable_id(self):
         await self.flow.async_step_reconfigure_choose({"person": "stable-child"})
         result = await self.flow.async_step_reconfigure_edit({

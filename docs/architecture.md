@@ -63,7 +63,8 @@ per-person disagreement while both aggregates remain equal.
 The per-runtime `parity_diverged_since` records the start of a continuous
 verifiable mismatch and resets on alignment or unavailable references.
 The diagnostic shadow binary sensor exposes the result alongside individual
-state reasons. The legacy production binary sensor is not accessed.
+state reasons. The live legacy production binary sensor may be optionally mapped for
+read-only parity checking in Beta 1; it is never used for FSM decisions.
 
 ## Restart and confidence
 

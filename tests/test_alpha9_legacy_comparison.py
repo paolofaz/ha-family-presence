@@ -145,6 +145,68 @@ class LegacyAggregateParityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(new.parity_diverged_since, self.now)
         self.assertEqual(self.raw, {"old_a": "home", "old_b": "home"})
 
+    async def test_actual_yaml_binary_reports_matches_and_temporary_lag(self):
+        self.raw["binary.casa"] = "off"
+        engine = ShadowCoordinator(
+            self.people, read_state=self.raw.get, clock=lambda: self.now,
+            legacy_aggregate="binary.casa",
+        )
+        await engine.force_state("a", State.HOME)
+        await engine.force_state("b", State.HOME)
+        snapshot = engine.legacy_comparison()
+        self.assertIs(snapshot.actual_legacy_all_away, False)
+        self.assertIs(snapshot.actual_legacy_matches_expected, True)
+        self.assertIs(snapshot.actual_legacy_matches_shadow, True)
+
+        self.raw.update(old_a="away", old_b="away")
+        await engine.force_state("a", State.AWAY)
+        await engine.force_state("b", State.AWAY)
+        snapshot = engine.legacy_comparison()
+        self.assertTrue(snapshot.legacy_expected_all_away)
+        self.assertTrue(snapshot.shadow_all_away)
+        self.assertIs(snapshot.actual_legacy_matches_expected, False)
+        self.assertIs(snapshot.actual_legacy_matches_shadow, False)
+
+        self.raw["binary.casa"] = "on"
+        engine.notify_legacy_aggregate_update()
+        snapshot = engine.legacy_comparison()
+        self.assertEqual(snapshot.actual_legacy_state, "on")
+        self.assertIs(snapshot.actual_legacy_matches_expected, True)
+        self.assertIs(snapshot.actual_legacy_matches_shadow, True)
+        self.assertEqual(snapshot.status, "aligned")
+
+    async def test_actual_legacy_binary_unavailable_never_claims_match(self):
+        self.raw.update(old_a="away", old_b="away", **{"binary.casa": "unknown"})
+        engine = ShadowCoordinator(
+            self.people, read_state=self.raw.get, clock=lambda: self.now,
+            legacy_aggregate="binary.casa",
+        )
+        await engine.force_state("a", State.AWAY)
+        await engine.force_state("b", State.AWAY)
+        snapshot = engine.legacy_comparison()
+        self.assertIsNone(snapshot.actual_legacy_all_away)
+        self.assertIsNone(snapshot.actual_legacy_matches_expected)
+        self.assertIsNone(snapshot.actual_legacy_matches_shadow)
+        self.assertTrue(snapshot.shadow_all_away)
+        self.assertTrue(snapshot.legacy_expected_all_away)
+
+    async def test_optional_binary_does_not_change_fsm_or_missing_refs(self):
+        self.raw["binary.casa"] = "on"
+        engine = ShadowCoordinator(
+            [PersonSources("a", "Paolo", reference="old_a"),
+             PersonSources("b", "Cristina")],
+            read_state=self.raw.get, clock=lambda: self.now,
+            legacy_aggregate="binary.casa",
+        )
+        await engine.force_state("a", State.AWAY)
+        await engine.force_state("b", State.AWAY)
+        cmp = engine.legacy_comparison()
+        self.assertEqual(cmp.status, "not_configured")
+        self.assertIsNone(cmp.legacy_expected_all_away)
+        self.assertIs(cmp.actual_legacy_all_away, True)
+        self.assertIs(cmp.actual_legacy_matches_shadow, True)
+        self.assertIsNone(cmp.actual_legacy_matches_expected)
+
     async def test_empty_household_never_claims_a_comparison(self):
         empty = self.new(people=[])
         cmp = empty.legacy_comparison()

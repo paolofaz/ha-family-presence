@@ -129,6 +129,7 @@ class ShadowCoordinator:
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         windows: Windows = Windows(),
         alarm: str | None = None,
+        legacy_aggregate: str | None = None,
         local_timezone: tzinfo = timezone.utc,
         report: Callable[[ShadowDecision], None] | None = None,
         report_block: Callable[[ShadowBlocked], None] | None = None,
@@ -148,6 +149,7 @@ class ShadowCoordinator:
         self._sleep = sleep
         self.windows = windows
         self.alarm = alarm
+        self.legacy_aggregate = legacy_aggregate
         self.local_timezone = local_timezone
         self.report = report
         self.report_block = report_block
@@ -192,6 +194,13 @@ class ShadowCoordinator:
         """Refresh comparison after a legacy/source entity has changed."""
         self._refresh_comparison(person)
         self._notify(person)
+
+    def notify_legacy_aggregate_update(self) -> None:
+        """Refresh external-template parity without touching the FSM."""
+        if self.people:
+            self._notify(next(iter(self.people)))
+        else:
+            self._refresh_parity_comparison()
 
     def _comparison_status(self, person: str) -> str:
         cfg = self.people[person]
