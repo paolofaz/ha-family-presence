@@ -5,7 +5,7 @@ Sources: phone tracker, Watch BLE, optional bag BLE sensor and shared
 gate/door/lock/alarm evidence. The original private family YAML is **not**
 included in this repository.
 
-> **Experimental Alpha 8 (0.1.0a8), shadow-only.** Do not disable the existing
+> **Experimental Alpha 9 (0.1.0a9), shadow-only.** Do not disable the existing
 > YAML presence, alarm, heating or notification automations. Diagnostic states
 > and manual buttons here do not write the original YAML helpers or operate
 > alarms, heating or locks.
@@ -83,6 +83,28 @@ determines the result. Contradicting iPhone/Watch readings appear only as
 A separate cutover will be needed after field comparison, when only one FSM
 will be allowed to drive production presence outputs.
 
+### Alpha 9: automatic parity with the legacy YAML helpers
+
+The shadow home-empty binary sensor now compares itself with the aggregate
+**reconstructed from the explicitly mapped legacy `input_select` references**
+for every person. It does **not** read or modify the live
+`binary_sensor.casa_certamente_vuota` entity. This is possible because the
+old template is ON if and only if every old person helper is `away`.
+
+The new attributes `legacy_comparison_status`,
+`legacy_expected_all_away`, `aggregate_matches_legacy`,
+`legacy_differing_members`, `legacy_divergence_since`, and
+`legacy_missing_reference_members`/`legacy_unavailable_reference_members`
+make mismatches actionable. Comparison statuses distinguish `aligned`,
+`aggregate_divergence`, `member_divergence`, `not_configured` and
+`reference_unavailable`. The timer tracks continuous mismatch during the
+current integration runtime. Missing or unavailable YAML references never
+produce a fake comparison result.
+
+This comparison is strictly **diagnostic**. FSM transitions and the
+authoritative **all members away = on**, including force buttons, are
+unchanged.
+
 ### Manual state forcing: one-off, not a hold
 
 For **each person**, two **diagnostic buttons** appear:
@@ -99,7 +121,7 @@ independent shadow state. These buttons do **not** control the alarm or YAML.
 ## Setup and diagnostics
 
 1. Leave the original YAML package and all related automations running.
-2. Install the Alpha 8 prerelease from the development branch when tagged and
+2. Install the Alpha 9 prerelease from the development branch when tagged and
    available through HACS; restart Home Assistant.
 3. Add **Family Presence** under Settings → Devices & Services, and map your
    phone, Watch, optional bag, gate, door, lock and armed-away alarm entities.
@@ -134,6 +156,7 @@ real outputs exist; that workflow requires separate approval and testing.
 See [Architecture](docs/architecture.md), [Backpack transitions](docs/bag-policy.md),
 [Alpha 6 field test](docs/alpha6-reliability.md),\n[Alpha 7 history](docs/alpha7-household-safety.md),
 [Alpha 8 authoritative aggregate](docs/alpha8-aggregate.md),
+[Alpha 9 parity diagnostics](docs/alpha9-legacy-parity.md),
 [Shadow test plan](docs/shadow-test-plan.md) and
 [GitHub PR #1](https://github.com/paolofaz/ha-family-presence/pull/1).
 
