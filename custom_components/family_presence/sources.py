@@ -18,7 +18,7 @@ from .const import (
     CONF_ALARM, CONF_BAG, CONF_BAG_POLICY, CONF_BAG_POLICIES, CONF_BAG_SCHEDULES,
     CONF_DOOR, CONF_GATE_ENTITIES,
     CONF_IPHONE, CONF_LOCK, CONF_PEOPLE, CONF_PERSON_NAME, CONF_PERSON_ID, CONF_REFERENCE,
-    CONF_WATCH,
+    CONF_LEGACY_AGGREGATE, CONF_WATCH,
 )
 from .coordinator import PersonSources, ShadowBlocked, ShadowCoordinator, ShadowDecision, ShadowIgnored, Windows
 from .fsm import BagPolicy, Event
@@ -119,6 +119,7 @@ def build_coordinator(hass: HomeAssistant, entry: Any) -> ShadowCoordinator:
         read_state=read_state,
         windows=Windows(**window_data),
         alarm=config.get(CONF_ALARM),
+        legacy_aggregate=config.get(CONF_LEGACY_AGGREGATE),
         local_timezone=ZoneInfo(hass.config.time_zone),
         report=report,
         report_block=report_block,
@@ -148,6 +149,8 @@ class ShadowSourceAdapter:
 
     def start(self) -> None:
         entities = set(self._person_inputs) | set(self._reference_inputs) | self._gates
+        if self.engine.legacy_aggregate:
+            entities.add(self.engine.legacy_aggregate)
         if self._door:
             entities.add(self._door)
         if self._lock:
@@ -188,6 +191,8 @@ class ShadowSourceAdapter:
             self.engine.notify_source_update(key)
         for key, _kind in self._person_inputs.get(entity_id, ()):
             self.engine.notify_source_update(key)
+        if entity_id == self.engine.legacy_aggregate:
+            self.engine.notify_legacy_aggregate_update()
 
         # Recovery from unknown/unavailable is NOT a new arrival/departure.
         # But a recovered OFF bag can reconcile the strict absence invariant.
