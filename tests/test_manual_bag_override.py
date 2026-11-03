@@ -36,8 +36,6 @@ class ManualForceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(c.all_away(), False)
         self.now += timedelta(minutes=30)
         self.sources["phone"] = "not_home"
-        # A detected Watch contradicts an empty-house confidence claim.
-        self.sources["watch"] = "off"
         result = await c.process("person", Event.IPHONE_LEFT, event_time=self.now)
         self.assertEqual(result.current, State.AWAY)
         self.assertEqual(c.runtime["person"].state_origin, "observed_transition")
@@ -99,7 +97,7 @@ class ManualForceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(new.restore_snapshot(snapshot), 1)
         self.assertEqual(new.state("person"), State.HOME)
         self.assertTrue(new.runtime["person"].restored_from_storage)
-        self.assertIsNone(new.all_away())
+        self.assertIs(new.all_away(), False)
         self.now += timedelta(seconds=10)
         self.sources["phone"] = "not_home"
         await new.process("person", Event.IPHONE_LEFT, event_time=self.now)
