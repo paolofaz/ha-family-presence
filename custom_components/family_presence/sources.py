@@ -20,7 +20,7 @@ from .const import (
     CONF_IPHONE, CONF_LOCK, CONF_PEOPLE, CONF_PERSON_NAME, CONF_PERSON_ID, CONF_REFERENCE,
     CONF_WATCH,
 )
-from .coordinator import PersonSources, ShadowBlocked, ShadowCoordinator, ShadowDecision, Windows
+from .coordinator import PersonSources, ShadowBlocked, ShadowCoordinator, ShadowDecision, ShadowIgnored, Windows
 from .fsm import BagPolicy, Event
 from .bag_schedule import BagSchedule, legacy_schedule
 from .labels import reason_label
@@ -108,6 +108,12 @@ def build_coordinator(hass: HomeAssistant, entry: Any) -> ShadowCoordinator:
             block.person, block.event.value, block.reference,
         )
 
+    def report_ignore(ignored: ShadowIgnored) -> None:
+        _LOGGER.info(
+            "[shadow][ignored] %s: %s (%s); baseline=%s",
+            ignored.person, ignored.event.value, ignored.reason, ignored.reference,
+        )
+
     return ShadowCoordinator(
         _person_specs(config, options),
         read_state=read_state,
@@ -116,6 +122,7 @@ def build_coordinator(hass: HomeAssistant, entry: Any) -> ShadowCoordinator:
         local_timezone=ZoneInfo(hass.config.time_zone),
         report=report,
         report_block=report_block,
+        report_ignore=report_ignore,
     )
 
 
@@ -188,8 +195,11 @@ class ShadowSourceAdapter:
             if new in ("off", "on") and entity_id in self._person_inputs:
                 for key, kind in self._person_inputs[entity_id]:
                     if kind == "bag":
-                        # OFF may reapply strict absence; ON may end a manual
-                        # exception. Neither recovery is a physical arrival.
+                        # Restored sensor values are not physical transitions.
+                        self.engine.note_ignored(
+                            key, Event.RECONCILE, at=at,
+                            reason="Ripristino sensore zaino: nessun ingresso/uscita dedotto",
+                        )
                         revision = self.engine.note_person_event(key)
                         self._schedule(self.engine.process(
                             key, Event.RECONCILE, event_time=at, revision=revision,
