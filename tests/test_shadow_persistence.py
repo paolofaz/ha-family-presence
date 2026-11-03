@@ -37,6 +37,77 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(new.state("child"), State.HOME)
         self.assertFalse(new.runtime["child"].restored_from_storage)
 
+    async def test_restart_with_valid_matching_legacy_keeps_reason_and_time(self):
+        first = self.new()
+        await first.process("child", Event.IPHONE_LEFT, event_time=self.time)
+        self.assertEqual(first.runtime["child"].last_reason, "iPhone left home zone")
+        previous_time = first.runtime["child"].last_changed
+        saved = first.snapshot()
+        # Both the live YAML reference and saved shadow state agree on AWAY.
+        self.values["reference"] = "away"
+        second = self.new()
+        # This counts restored STATES, not compatible diagnostic metadata.
+        self.assertEqual(second.restore_snapshot(saved), 0)
+        self.assertEqual(second.state("child"), State.AWAY)
+        self.assertEqual(second.runtime["child"].last_reason, "iPhone left home zone")
+        self.assertEqual(second.runtime["child"].last_changed, previous_time)
+        self.assertEqual(second.runtime["child"].state_origin, "legacy_reference")
+        self.assertEqual(second.runtime["child"].reason_origin,
+                         "saved_snapshot_matched_legacy")
+        self.assertFalse(second.runtime["child"].restored_from_storage)
+        self.assertIs(second.all_away(), True)
+        # Startup reconcile must not replace a valid recorded cause.
+        await second.reconcile()
+        self.assertEqual(second.runtime["child"].last_reason, "iPhone left home zone")
+
+    async def test_saved_cause_is_not_attributed_to_disagreeing_legacy(self):
+        first = self.new()
+        await first.process("child", Event.IPHONE_LEFT, event_time=self.time)
+        saved = first.snapshot()
+        self.assertEqual(saved["people"]["child"]["state"], "away")
+        # YAML reports a more recent return not yet reflected in this snapshot.
+        self.values["reference"] = "home"
+        reloaded = self.new()
+        self.assertEqual(reloaded.restore_snapshot(saved), 0)
+        self.assertEqual(reloaded.state("child"), State.HOME)
+        self.assertIsNone(reloaded.runtime["child"].last_reason)
+        self.assertIsNone(reloaded.runtime["child"].last_changed)
+        self.assertEqual(reloaded.runtime["child"].reason_origin, "not_recorded")
+        self.assertIs(reloaded.all_away(), False)
+
+    async def test_restart_does_not_erase_reason_on_second_restart(self):
+        first = self.new()
+        await first.process("child", Event.IPHONE_LEFT, event_time=self.time)
+        self.values["reference"] = "away"
+        second = self.new()
+        second.restore_snapshot(first.snapshot())
+        self.assertEqual(second.runtime["child"].last_reason, "iPhone left home zone")
+        third = self.new()
+        third.restore_snapshot(second.snapshot())
+        self.assertEqual(third.runtime["child"].last_reason, "iPhone left home zone")
+        self.assertEqual(third.runtime["child"].reason_origin,
+                         "saved_snapshot_matched_legacy")
+
+    async def test_changed_person_mapping_does_not_copy_old_reason(self):
+        first = self.new()
+        await first.process("child", Event.IPHONE_LEFT, event_time=self.time)
+        saved = first.snapshot()
+        self.values["reference"] = "away"
+        second = self.new(iphone="new_phone")
+        self.assertEqual(second.restore_snapshot(saved), 0)
+        self.assertEqual(second.state("child"), State.AWAY)
+        self.assertIsNone(second.runtime["child"].last_reason)
+        self.assertEqual(second.runtime["child"].state_origin, "legacy_reference")
+
+    async def test_missing_prior_reason_cannot_be_invented(self):
+        first = self.new()
+        self.values["reference"] = "away"
+        second = self.new()
+        second.restore_snapshot(first.snapshot())
+        self.assertIsNone(second.runtime["child"].last_reason)
+        self.assertEqual(second.runtime["child"].reason_origin, "not_recorded")
+        self.assertEqual(second.runtime["child"].state_origin, "legacy_reference")
+
     async def test_restore_when_reference_unavailable_but_mapping_same(self):
         first = self.new()
         await first.process("child", Event.IPHONE_LEFT, event_time=self.time)

@@ -61,6 +61,10 @@ class PersonRuntime:
     # Seeded near_home has unknown age; only newly observed entries have a timer.
     near_home_entered_at: datetime | None = None
     restored_from_storage: bool = False
+    # State and reason have different provenance: a live YAML reference can
+    # establish state while a compatible snapshot supplies historical *reason*.
+    state_origin: str = "unknown"
+    reason_origin: str = "not_recorded"
     last_blocked_event: Event | None = None
     last_blocked_at: datetime | None = None
     decisions: list[ShadowDecision] = field(default_factory=list)
@@ -111,8 +115,12 @@ class ShadowCoordinator:
         if len(self.people) != len(people):
             raise ValueError("Person identifiers must be unique")
         self.runtime: dict[str, PersonRuntime] = {
-            p.key: PersonRuntime(state=parse_state(read_state(p.reference)) if p.reference else None)
+            p.key: PersonRuntime(
+                state=seed,
+                state_origin="legacy_reference" if seed is not None else "unknown",
+            )
             for p in people
+            for seed in [parse_state(read_state(p.reference)) if p.reference else None]
         }
         self._physical: dict[str, datetime] = {}
         self._read = read_state
@@ -166,10 +174,17 @@ class ShadowCoordinator:
         }
 
     def restore_snapshot(self, data: Any) -> int:
-        """Restore a shadow state only when no live legacy helper is available.
+        """Restore state and/or diagnostic reason from a compatible snapshot.
 
-        Physical evidence and near_home age are intentionally never restored.
-        A restored state is marked diagnostic-only, never proof for alarm use.
+        A valid live YAML helper has priority for STATE. If the saved shadow
+        state agrees with it, retain the saved cause and timestamp too. A
+        disagreeing or reconfigured snapshot must NOT attribute a stale cause
+        to the current state. Without a usable YAML reference, the snapshot
+        may recover state but is explicitly marked unverified for all-away.
+
+        Physical events and provisional near-home durations NEVER survive
+        restart. The return value counts state restored without a reference,
+        not diagnostic metadata restored with an agreeing reference.
         """
         if not isinstance(data, dict) or data.get("format") != 1:
             return 0
@@ -179,27 +194,47 @@ class ShadowCoordinator:
         restored = 0
         for key, rt in self.runtime.items():
             config = self.people[key]
-            # A currently valid YAML reference is more authoritative than a
-            # saved shadow state and avoids stale shadow state after a restart.
-            if config.reference and parse_state(self._read(config.reference)) is not None:
-                continue
             record = people.get(key)
-            if not isinstance(record, dict) or record.get("fingerprint") != self._fingerprint(config):
+            if not isinstance(record, dict):
                 continue
-            parsed = parse_state(record.get("state"))
-            if parsed is None:
+            if record.get("fingerprint") != self._fingerprint(config):
                 continue
-            rt.state = parsed
-            rt.last_reason = record.get("reason") if isinstance(record.get("reason"), str) else None
+            saved_state = parse_state(record.get("state"))
+            if saved_state is None:
+                continue
+
+            # Seeded from the live reference in __init__: don't replace a
+            # known reference state or its occupancy confidence with storage.
+            reference_state = rt.state
+            if reference_state is not None:
+                if saved_state != reference_state:
+                    continue  # Saved reason would describe a DIFFERENT state.
+                rt.state_origin = "legacy_reference"
+                rt.restored_from_storage = False
+                reason_origin = "saved_snapshot_matched_legacy"
+            else:
+                rt.state = saved_state
+                rt.state_origin = "saved_shadow_unverified"
+                rt.restored_from_storage = True
+                reason_origin = "saved_snapshot_unverified"
+                restored += 1
+
+            reason = record.get("reason")
+            if isinstance(reason, str) and reason.strip():
+                rt.last_reason = reason
+                rt.reason_origin = reason_origin
+            else:
+                rt.last_reason = None
+                rt.reason_origin = "not_recorded"
+
+            rt.last_changed = None
             ts = record.get("last_changed")
             if isinstance(ts, str):
                 try:
                     rt.last_changed = _aware_utc(datetime.fromisoformat(ts))
                 except ValueError:
-                    rt.last_changed = None
-            rt.near_home_entered_at = None  # Unknown elapsed time at restart.
-            rt.restored_from_storage = True
-            restored += 1
+                    pass
+            rt.near_home_entered_at = None
         return restored
 
     def note_person_event(self, person: str) -> int:
@@ -301,6 +336,8 @@ class ShadowCoordinator:
             rt.state = result.state
             rt.last_reason = result.reason
             rt.restored_from_storage = False
+            rt.state_origin = "observed_transition"
+            rt.reason_origin = "observed_event"
             when = _aware_utc(self._clock())
             near_home_duration: float | None = None
             if result.state != previous:

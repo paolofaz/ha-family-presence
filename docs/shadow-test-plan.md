@@ -26,6 +26,9 @@ Family Presence is experimental. **Do not remove the existing YAML package, rewi
 | Bag starts up `unavailable→off` | Reconcile priority only, not a synthetic physical off-event |
 | Rename member / swap selected Watch / remove member | Shadow configuration reloads; stable identity remains for a rename and stale evidence is not inherited across changed source mappings |
 | Previously saved shadow `away` with no valid live legacy helper | Internal all-away is **unknown**, not confirmed true |
+| Restart when valid YAML and saved shadow both say `away` | Preserve old shadow `reason` and last transition; `reason_origin` becomes `saved_snapshot_matched_legacy`, no new exit event |
+| Restart when YAML and saved shadow disagree | Keep YAML state; do **not** attribute a stale cause to it; `reason_origin=not_recorded` |
+| Restart when no matching snapshot reason exists | State may still be correct; `reason` stays empty, never fabricated |
 
 Caution: the strict bag veto takes effect only after the *upstream* bag sensor actually reports `off`. A physically absent bag may remain `on` for about three minutes. Watch BLE has its own configured 15s polling / 180s timeout. A shared condominium gate event is corroboration, not identity.
 

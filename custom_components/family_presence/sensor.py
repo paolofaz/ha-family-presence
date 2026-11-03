@@ -49,6 +49,8 @@ class ShadowPersonSensor(SensorEntity):
             "mode": "shadow_only",
             "do_not_use_for_automations": True,
             "reason": rt.last_reason,
+            "reason_origin": rt.reason_origin,
+            "state_origin": rt.state_origin,
             "last_transition": rt.last_changed.isoformat() if rt.last_changed else None,
             "near_home_since": (
                 rt.near_home_entered_at.isoformat() if rt.near_home_entered_at else None

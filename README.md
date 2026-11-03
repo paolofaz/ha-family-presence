@@ -2,7 +2,7 @@
 
 A configurable, multi-person Home Assistant presence FSM using phone zone tracking, BLE wearables, physical gate/door/lock events, and optional bag sensors.
 
-> **Experimental shadow build (0.1.0a2): DO NOT REPLACE YOUR EXISTING YAML.** The integration subscribes to HA inputs, records *shadow-only* state snapshots and exposes **diagnostic shadow sensors**, never production presence entities. It does **not** modify existing `input_select` values, or control alarm/locks/heating. It has not yet been end-to-end tested inside a running Home Assistant instance.
+> **Experimental shadow build (0.1.0a3): DO NOT REPLACE YOUR EXISTING YAML.** The integration subscribes to HA inputs, records *shadow-only* state snapshots and exposes **diagnostic shadow sensors**, never production presence entities. It does **not** modify existing `input_select` values, or control alarm/locks/heating. It has not yet been end-to-end tested inside a running Home Assistant instance.
 
 ## Core behavior
 
@@ -33,7 +33,7 @@ A configurable, multi-person Home Assistant presence FSM using phone zone tracki
 
 7. Review log entries `[shadow]` and `[shadow][blocked]`. They are **observations**, not state changes. No alarm automations should be switched over to this integration.
 
-On restart, the integration prefers a **currently valid YAML helper state**. If the helper is missing/unknown, a compatible saved shadow snapshot may be restored and is explicitly flagged `restored_from_storage`. A snapshot is accepted only for the **same per-person source mapping and bag policy**. If neither helper nor snapshot is available, state remains unknown until a decisive event. Only state/reason/last-change metadata are stored; **BLE event, gate and door timestamps are intentionally cleared at restart** to avoid accidental reused evidence. A valid bag OFF constraint is reconciled on startup.
+On restart, the integration prefers a **currently valid YAML helper state**. If the persisted shadow state agrees with the valid YAML state and its source mapping still matches, the **previous shadow reason and last-transition timestamp** are restored as historical diagnostics, not synthesized events. The diagnostic attributes `state_origin` and `reason_origin` reveal which source established each. If the helper is missing/unknown, a compatible saved shadow snapshot may instead restore the state, explicitly flagged `restored_from_storage`. A snapshot is accepted only for the **same per-person source mapping and bag policy**. If neither helper nor snapshot is available, state remains unknown until a decisive event. Only state/reason/last-change metadata are stored; **BLE event, gate and door timestamps are intentionally cleared at restart** to avoid accidental reused evidence. A valid bag OFF constraint is reconciled on startup.
 
 ## Configuration policy: limited flexibility
 
@@ -59,6 +59,7 @@ Core FSM states, decision/event types, precedence between phone/Watch/physical i
 - `docs/architecture.md`: architecture, transition semantics and migration roadmap.
 - `docs/shadow-test-plan.md`: safe real-world installation and validation checklist.
 - `docs/alpha2-install.md`: Home Assistant helper-category fix and instructions for testing alpha 2.
+- `docs/alpha3-restart.md`: Alpha 3 reason-restoration fix, test cases and installation instructions.
 - `tests/`: pure unit tests; run `python -m unittest discover -s tests -v`.
 - `.github/workflows/validate.yml`: unit tests, hassfest and HACS validation.
 
