@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sys
 import types
@@ -174,6 +174,7 @@ class ShadowSensorTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(attrs["all_away_internal"])
 
         self.s["phone"] = "not_home"
+        self.now += timedelta(seconds=2)  # New sensor event must follow manual force.
         await engine.process("person", Event.IPHONE_LEFT, event_time=self.now)
         self.assertEqual(household.native_value, "candidate_empty")
         self.assertIs(household.extra_state_attributes["all_away_internal"], True)
