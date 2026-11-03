@@ -190,6 +190,31 @@ class ShadowAllAwayTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(attrs["legacy_expected_all_away"])
         self.assertIsNone(attrs["aggregate_matches_legacy"])
 
+    async def test_live_legacy_binary_attributes_independent_of_expected(self):
+        self.raw["legacy_actual"] = "off"
+        engine = ShadowCoordinator(
+            self.members,
+            read_state=self.raw.get,
+            clock=lambda: self.now,
+            legacy_aggregate="legacy_actual",
+        )
+        sensor = await self.entity(engine)
+        for key in engine.people:
+            await engine.force_state(key, State.AWAY)
+        attrs = sensor.extra_state_attributes
+        self.assertEqual(attrs["actual_legacy_state"], "off")
+        self.assertIs(attrs["actual_legacy_all_away"], False)
+        self.assertIs(attrs["actual_legacy_matches_shadow"], False)
+        self.assertIs(attrs["legacy_expected_all_away"], False)
+        self.assertIs(attrs["actual_legacy_matches_expected"], True)
+
+        self.raw["legacy_actual"] = "on"
+        engine.notify_legacy_aggregate_update()
+        attrs = sensor.extra_state_attributes
+        self.assertIs(attrs["actual_legacy_matches_shadow"], True)
+        self.assertIs(attrs["actual_legacy_matches_expected"], False)
+        self.assertTrue(sensor.is_on)
+
     async def test_near_home_and_unknown_are_off(self):
         sensor = await self.entity()
         for key in self.engine.people:
