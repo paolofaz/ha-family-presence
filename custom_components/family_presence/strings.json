@@ -4,13 +4,14 @@
     "step": {
       "user": {
         "title": "Household",
-        "description": "Select shared input entities. Development stage: no state changes yet.",
+        "description": "Select shared inputs. The beta stays in shadow mode: no alarm commands.",
         "data": {
           "household_name": "Household name",
           "gate_entities": "Gate sensors (optional)",
           "door_contact": "Door contact (optional)",
           "door_lock": "Door lock (optional)",
-          "alarm": "Alarm (optional)"
+          "alarm": "Alarm (optional)",
+          "legacy_all_away_binary": "Legacy Casa certamente vuota binary sensor (optional, comparison only)"
         }
       },
       "person": {
@@ -47,7 +48,8 @@
           "gate_entities": "Gate sensors (optional)",
           "door_contact": "Door contact (optional)",
           "door_lock": "Door lock (optional)",
-          "alarm": "Alarm (optional)"
+          "alarm": "Alarm (optional)",
+          "legacy_all_away_binary": "Legacy Casa certamente vuota binary sensor (optional, comparison only)"
         }
       },
       "reconfigure_choose": {
