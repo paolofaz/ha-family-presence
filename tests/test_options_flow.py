@@ -171,7 +171,7 @@ class OptionsFlowTests(unittest.IsolatedAsyncioTestCase):
         choice_form = await flow.async_step_bag_person()
         self.assertEqual(choice_form["schema"]["person"], {"child-id": "Child"})
         result = await flow.async_step_bag_person({"person": "child-id"})
-        self.assertEqual(result["step_id"], "bag_policy")
+        self.assertEqual(result["step_id"], "bag_schedule")
         self.assertEqual(result["description_placeholders"]["person"], "Child")
 
     async def test_schedule_form_shows_enabled_hours_and_weekdays(self):

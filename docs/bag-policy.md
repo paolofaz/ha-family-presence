@@ -1,39 +1,52 @@
-# Bag policy: priority is asymmetric
+# Backpack schedule — event-based behavior (Alpha 5)
 
-## Rules agreed for design
+This replaces the earlier two backpack priority modes. No permanent bag-off
+guard, no school-only policy switch, no eight-hour manual hold.
 
-1. **Bag currently OFF ⇒ AWAY** in **Priorità assoluta** mode (stored as `always`), irrespective of phone, Watch, gate or door. This is a continuing guard, not merely a one-time departure event.
-2. **Bag OFF → ON ⇒ HOME**: an actual, validated sensor transition confirms the arrival.
-3. **Bag already ON ⇒ no precedence**: phone/Watch and existing FSM can change the person to AWAY. Bag presence does not continually force HOME.
-4. **Bag UNKNOWN/UNAVAILABLE** must not be interpreted as OFF. A sensor recovering to OFF may re-apply the absence guard, but its recovery alone is not a new arrival.
-5. **Fascia scolastica** mode (stored as `legacy`) remains available per person, retaining weekday morning bag departures and allowing phone/Watch to override. The option can now be changed for a specific person from Family Presence → Configure; the shadow coordinator reloads.
+## Single rule
 
-## Interaction with the BLE provider
+- **ON→OFF**: if enabled and this event timestamp falls inside the configured
+  local time window *and* selected weekday, set **away**, even if phone/Watch
+  evidence disagreed immediately before this event.
+- **OFF→ON**: if enabled, set **home** at any time, independent of the configured
+  departure schedule.
+- **OFF steady**: does **not** veto later phone/Watch/door events. A later
+  valid event can set home or away using the normal FSM.
+- **Disabled**: both bag transitions are ignored by Family Presence.
+- **unknown/unavailable→on/off**: not a real bag transition, so no automatic
+  home/away. A reboot finding the bag already OFF does not synthesize departure.
 
-The actual backpack provider, `beacon_ble_presence`, already waits **180 seconds since the last valid advertisement** before declaring OFF (checked periodically). There is **no extra mandatory absence debounce** in Family Presence by design. A second timer could double departure latency. However, a physically absent backpack may report ON during that initial 180-second window, when the strict veto cannot apply. See [ble-sources.md](ble-sources.md) for full source review and limitations.
+## Options
 
-## Why
+Per-person schedule has `enabled`, `start`, `end`, `days`.
+Dates are evaluated in the Home Assistant timezone at the **HA event time**,
+not when the asynchronous queue happens to process the event.
 
-A Watch charging at home may turn ON during school hours. A neighbor opening a shared condominium gate shortly beforehand can then create a false HOME confirmation, even though the child's bag is still outside. The absent bag takes precedence over this indirect inference, at any time of day.
+- 07:00–09:10, Mon–Fri: school window.
+- 00:00–00:00, all days: always enabled for departure.
+- 22:00–02:00, Monday: Monday evening through Tuesday 01:59.
+- Enabled = false: disable the bag entirely.
 
-## Real trade-offs
+The independent BLE source applies its own 180s absence timeout; this FSM
+responds when its binary sensor actually transitions to OFF. We must still
+evaluate false OFFs and the blind period before the provider publishes OFF.
 
-A child may return without their bag; strict mode can therefore say AWAY while the child really is home. False bag OFF readings can produce the same problem. **Do not connect this experimental logic to alarm automations until provider reliability, diagnostic conflicts and the new shadow-only manual exception are validated with real sensors.**
+## Manual correction
 
-## Test matrix
+Two buttons per person set a one-off `home` or `away` decision. They do not
+lock the state or change the backpack's schedule. After an explicit button
+press, the next **new** Watch, phone or bag event can change the state.
 
-| Earlier FSM | Event | Current bag | Strict output |
-| --- | --- | --- | --- |
-| AWAY | Watch ON + neighbor gate | OFF | remains AWAY |
-| AWAY | iPhone enters home | OFF | remains AWAY |
-| HOME | Bag goes OFF at 11:00 | OFF | AWAY |
-| AWAY | Bag transitions OFF → ON | ON | HOME |
-| HOME | iPhone leaves while bag already ON | ON | AWAY |
-| HOME | Watch OFF with valid departure evidence, bag ON | ON | AWAY |
-| HOME | Bag becomes UNKNOWN | UNKNOWN | no automatic arrival or departure |
-| Unknown | Reconcile with stable bag OFF | OFF | AWAY |
+## Migration
 
-The current coordinator evaluates the real bag state **after** any Watch ON delay and prevents a queued older Watch ON from overtaking a new bag/phone/Watch event. Alpha 5 adds an explicit shadow-only human-confirmed HOME exception, an eight-hour advisory review with no automatic exit, and an explicit revocation to unknown rather than away. Live end-to-end validation and production safety approval are still outstanding.
+Previously configured `always` maps to a 24h/all-days schedule,
+`legacy` maps to weekday 07:00–09:10. These values remain internal solely
+for reading existing Alpha snapshots/configuration; they are no longer
+user-facing options or FSM precedence modes.
 
+## Critical alarm safety note
 
-Before stable release decide whether to keep both bag policies or simplify to one; track the decision in issue #3. Keep both unchanged during current testing.
+This is shadow-only. A future production force-away button could contribute
+to a claim that the house is empty. Until all-away confidence and automation
+behavior are validated, do not use these buttons or diagnostic sensors to
+arm or disarm any alarm.

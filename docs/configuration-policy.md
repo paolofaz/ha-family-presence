@@ -1,51 +1,45 @@
-# Configuration philosophy: a bounded policy surface
+# Configuration philosophy — limited, understandable parameters
 
-**Decision:** keep the deterministic FSM in Python and expose only parameters with a clearly defined safety and UX purpose. We deliberately do not support arbitrary rule expressions, editable priorities, or a universal automation editor.
+The Python FSM owns the state transition rules. The user configures sensor
+mappings and **when a bag departure event matters**, never arbitrary rules,
+priority expressions, or a generic automations editor.
 
-## Fixed, tested engine
+## Per household
 
-- State model `home`, `away`, `near_home`.
-- Transition and evidence rules: when phone/Watch/physical/bag changes can move a person.
-- One serialized state writer per person and explicit unknown/unavailable handling.
-- Asymmetric bag semantics: confirmed bag absent can force away; actual off→on arrival confirms home; a bag simply being present **does not** keep a person home.
-- Watch ON evaluation delay of two seconds, currently fixed until evidence justifies tuning.
-- Conservative all-away semantics; no actuator calls from the integration.
+Phone/Watch/beacon entity mappings and shared gate, door, lock and alarm entity
+mappings; six evidence correlation windows (existing YAML defaults); unlimited
+number of members, each with a stable identifier. Source remapping and member
+changes use **Reconfigure**. Evidence-window settings use **Configure**.
 
-## Configurable per household
+BLE absence/presence timing stays in the independent Watch/Beacon integrations.
 
-- Person mappings to phone tracker, Watch/BLE binary sensor, optional bag binary sensor, optional legacy helper. These are editable in **Reconfigure** without removing the entry. Users can also add/remove members; removing the last member is forbidden. Personal source entities cannot be shared between members.
-- Shared gate, door, lock and alarm entities, modified with the integration entry's **Reconfigure** action.
-- Six physical-event correlation time windows in **seconds** with original YAML defaults. Adjusted via Configure → Event correlation windows.
-- No Bluetooth scan or absence timeout settings: these belong to Beacon BLE Presence, Watch BLE Presence, or an alternative entity provider.
+## Per person: one backpack schedule, not two policies
 
-## Configurable per person
+In **Configure → Backpack schedule → person**, choose:
+- Enabled (false ignores the bag completely)
+- Start time and end time (equal means 24 hours)
+- Selected weekdays (0 Monday through 6 Sunday)
 
-Only **backpack precedence** is exposed as an explicit behavioral policy, and only for a person who has a configured bag:
+Bag ON→OFF during that window sets AWAY **once**. Bag OFF→ON sets HOME any
+time while enabled. All other valid sensor events subsequently work normally.
+An overnight window may cross midnight. New members default to weekdays
+07:00–09:10. Prior Alpha `always` migrates to full-day, `legacy` to school
+hours, without retaining a separate behavior mode.
 
-| Policy | Semantics |
-| --- | --- |
-| **Priorità assoluta** (stored as `always`, default) | A currently OFF bag forces away, any time; a real off→on arrival sets home; a bag already on is not a home lock. |
-| **Fascia scolastica** (stored as `legacy`) | Original weekday 07:00–09:10 bag departure, without an always-on veto. Other sources may override. |
+## Manual state input
 
-Go to **Configure → Backpack priority → choose person → choose policy**. A policy change is stored in `entry.options["bag_policies"][person_id]`, without altering person source identifiers. `OptionsFlowWithReload` reloads the shadow integration so it becomes active. Previous early config entries without `person_id` use a normalized name key for compatibility.
+Every member exposes two diagnostic-only buttons:
+**Forza a casa** and **Forza fuori casa**. Each is a one-time state event,
+not a lock, a hold or a manual-exception timeout. The next new iPhone, Watch
+or bag state-change event can update the state.
 
-## Configure versus Reconfigure (Home Assistant UI)
+## Not configurable / not production yet
 
-**Configure** changes policy/settings (`entry.options`): six correlation windows and per-person bag precedence. **Reconfigure** changes setup data (`entry.data`): household name/common physical entities and the set of people and their source entity mappings. Reconfigure uses the existing entry's unique ID and reloads it; it never creates a second entry or edits YAML.
+Core FSM, evidence ordering, invalid-source filtering, conservative all-away,
+and source-delay handling remain tested code. There is no automatic
+near-home timeout or permanent backpack veto. All manual buttons and shadow
+presence entities are isolated from production alarm automations.
 
-New members receive stable IDs independent of their names. For early name-based entries, the first edit freezes the original normalized key into `person_id` to prevent a rename from changing entity identity. Source remapping invalidates stale shadow snapshots via a source-and-policy fingerprint; a change to the **read-only YAML comparison helper does not**. The engine never seeds from legacy YAML. New setups with no saved state start unknown until their own evidence arrives.
-
-## Deliberately not configurable yet
-
-- `near_home` automatic timeout: could incorrectly contribute to all-away and arm an alarm, so shadow diagnostics are collected first.
-- A school-hours bag veto: would allow false Watch arrivals after the cutoff; add only with evidence.
-- Further bag-OFF debounce: the dedicated provider already waits 180 seconds after last advertisement; adding a second delay could double absence latency.
-- Arbitrary conditions, priorities, scripts or template actions: opaque and difficult to test.
-- Production-safe manual override and all-away outputs: Alpha 5 adds diagnostic-only buttons for confirmed HOME without a bag, and a conservative revocation path. Full field validation and production approval are still required.
-
-All changes remain shadow-only until Home Assistant runtime and safety scenarios have been verified.
-
-
-## Decisione finale sulle due politiche dello zaino
-
-Durante la fase shadow manteniamo **Priorità assoluta** e **Fascia scolastica** con i valori interni invariati. **Prima della release stabile** riesamineremo se lasciarle entrambe oppure semplificare a una sola, con i dati reali del test. Questa decisione aperta è annotata nella [issue #3](https://github.com/paolofaz/ha-family-presence/issues/3).
+The earlier decision issue about `always` versus `legacy` is **resolved by
+this single schedule model**; there is no two-mode choice to revisit for
+the final release. Only real-world field behavior and safety remain to verify.
