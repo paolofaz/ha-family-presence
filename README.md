@@ -74,7 +74,10 @@ for production automations.
 A manually forced AWAY, a restored-but-unverified state, an iPhone reporting
 HOME, a detected Watch, absent usable sources or an ON backpack without
 independent evidence the iPhone is outside block the candidate-empty verdict.
-This does **not** change any person's HOME/AWAY/NEAR_HOME transition rules;
+A genuine new iPhone transition may also corroborate a manually forced or
+restored state that already has the same HOME/AWAY value, without changing the
+person's state. An unavailable iPhone does not provide corroboration.
+This does **not** change the normal HOME/AWAY/NEAR_HOME transition rules;
 it only makes the internal household assessment more conservative. The
 existing YAML remains the sole authority for alarm actions.
 
