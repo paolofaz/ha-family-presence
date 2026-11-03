@@ -52,6 +52,19 @@ Source mapping is configurable separately. Members get stable IDs and can be
 renamed without changing entity identity. Bluetooth source timeout settings
 remain owned by their dedicated HA BLE integrations.
 
+## Aggregate and individual YAML parity
+
+`comparison.py` rebuilds the old YAML's logical all-away result from the
+**configured per-member comparison helpers**. It never seeds or alters the
+new FSM. A missing/unavailable helper results in an explicit unverified
+comparison, not a guessed match. It separates aggregate disagreement from
+per-person disagreement while both aggregates remain equal.
+
+The per-runtime `parity_diverged_since` records the start of a continuous
+verifiable mismatch and resets on alignment or unavailable references.
+The diagnostic shadow binary sensor exposes the result alongside individual
+state reasons. The legacy production binary sensor is not accessed.
+
 ## Restart and confidence
 
 Snapshot **format 5** fingerprints source mappings (iPhone/Watch/bag) alone.
