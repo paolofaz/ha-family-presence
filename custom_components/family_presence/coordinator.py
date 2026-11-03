@@ -620,23 +620,22 @@ class ShadowCoordinator:
             )
         ]
 
-    def all_away(self) -> bool | None:
-        """Conservative internal verdict: stale restored states never prove absence.
+    def household_assessment(self):
+        """Compute a diagnostics-only readiness report without side effects."""
+        from .readiness import assess_household
 
-        A confirmed HOME or NEAR_HOME means not all away. An absent member
-        snapshot or unknown state means we cannot establish certainty. Only
-        when every member has a non-restored AWAY state is the verdict True.
-        This is still an internal shadow calculation, not an HA entity.
+        return assess_household(self)
+
+    def all_away(self) -> bool | None:
+        """Conservative internal tri-state used solely for shadow diagnostics.
+
+        Manual AWAY, restored states, source outages and contradictory live
+        signals never establish certain emptiness. This is never an actuator
+        command or a production Home Assistant entity.
         """
-        runtimes = tuple(self.runtime.values())
-        if not runtimes:
-            return None
-        if any(
-            rt.state in (State.HOME, State.NEAR_HOME)
-            and not rt.restored_from_storage
-            for rt in runtimes
-        ):
+        status = self.household_assessment().status
+        if status == "candidate_empty":
+            return True
+        if status == "presence_indicated":
             return False
-        if any(rt.state is None or rt.restored_from_storage for rt in runtimes):
-            return None
-        return True
+        return None
