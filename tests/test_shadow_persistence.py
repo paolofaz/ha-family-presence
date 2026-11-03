@@ -54,7 +54,7 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         first = await self.outside()
         snapshot = first.snapshot()
         original_time = first.runtime["child"].last_changed
-        self.assertEqual(snapshot["format"], 4)
+        self.assertEqual(snapshot["format"], 5)
         self.values["reference"] = "home"  # YAML DISAGREES.
         restarted = self.new()
         self.assertIsNone(restarted.state("child"))
@@ -80,12 +80,12 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(next_run.state("child"), State.AWAY)
             self.assertEqual(next_run.runtime["child"].last_reason, "iPhone left home zone")
             saved = next_run.snapshot()
-        self.assertEqual(saved["format"], 4)
+        self.assertEqual(saved["format"], 5)
 
     async def test_changing_only_comparison_helper_preserves_new_format(self):
         first = await self.outside()
         saved = first.snapshot()
-        self.assertEqual(saved["format"], 4)
+        self.assertEqual(saved["format"], 5)
         other_reference = self.new(reference="another_ref")
         self.assertEqual(other_reference.restore_snapshot(saved), 1)
         self.assertEqual(other_reference.state("child"), State.AWAY)
@@ -103,9 +103,9 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(upgraded.restore_snapshot(saved), 1)
         self.assertEqual(upgraded.state("child"), State.AWAY)
         self.assertEqual(upgraded.runtime["child"].last_reason, "iPhone left home zone")
-        self.assertEqual(upgraded.snapshot()["format"], 4)
+        self.assertEqual(upgraded.snapshot()["format"], 5)
 
-    async def test_changed_source_or_priority_rejects_stale_snapshot(self):
+    async def test_source_remapping_is_rejected_but_schedule_edits_preserve_state(self):
         first = await self.outside()
         saved = first.snapshot()
         new_source = self.new(iphone="new_phone")
@@ -114,8 +114,35 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         new_schedule = self.new(bag_schedule=BagSchedule(
             True, "00:00", "00:00", ALL_DAYS,
         ))
-        self.assertEqual(new_schedule.restore_snapshot(saved), 0)
-        self.assertIsNone(new_schedule.state("child"))
+        self.assertEqual(new_schedule.restore_snapshot(saved), 1)
+        self.assertEqual(new_schedule.state("child"), State.AWAY)
+        self.assertEqual(new_schedule.runtime["child"].last_reason, "iPhone left home zone")
+        self.assertTrue(new_schedule.runtime["child"].restored_from_storage)
+        self.assertIsNone(new_schedule.all_away())
+
+    async def test_alpha5_format_four_migrates_with_unchanged_schedule(self):
+        first = await self.outside()
+        legacy = first.snapshot()
+        legacy["format"] = 4
+        legacy["people"]["child"]["fingerprint"] = first._fingerprint(
+            first.people["child"]
+        )
+        upgraded = self.new()
+        self.assertEqual(upgraded.restore_snapshot(legacy), 1)
+        self.assertEqual(upgraded.state("child"), State.AWAY)
+        self.assertEqual(upgraded.snapshot()["format"], 5)
+        # Format 4 contains no source-only fingerprint, so arbitrary schedule
+        # changes cannot be verified safely until the first Alpha 6 save.
+        changed = self.new(bag_schedule=BagSchedule(True, "00:00", "00:00", ALL_DAYS))
+        self.assertEqual(changed.restore_snapshot(legacy), 0)
+
+    async def test_disabled_schedule_does_not_erase_saved_state(self):
+        first = await self.outside()
+        disabled = self.new(bag_schedule=BagSchedule(
+            False, "09:00", "12:00", ALL_DAYS,
+        ))
+        self.assertEqual(disabled.restore_snapshot(first.snapshot()), 1)
+        self.assertEqual(disabled.state("child"), State.AWAY)
 
     async def test_stale_snapshot_cannot_make_all_away_true(self):
         initial = await self.outside()
@@ -211,7 +238,7 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         serialized = str(snapshot)
         for secret in ("last_seen", "rssi", "irk", "another_ref", "phone_value"):
             self.assertNotIn(secret, serialized)
-        self.assertEqual(snapshot["format"], 4)
+        self.assertEqual(snapshot["format"], 5)
 
 
 if __name__ == "__main__":
