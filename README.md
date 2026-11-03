@@ -2,7 +2,7 @@
 
 A configurable, multi-person Home Assistant presence FSM using phone zone tracking, BLE wearables, physical gate/door/lock events, and optional bag sensors.
 
-> **Experimental shadow build (0.1.0a3): DO NOT REPLACE YOUR EXISTING YAML.** The integration subscribes to HA inputs, records *shadow-only* state snapshots and exposes **diagnostic shadow sensors**, never production presence entities. It does **not** modify existing `input_select` values, or control alarm/locks/heating. It has not yet been end-to-end tested inside a running Home Assistant instance.
+> **Experimental shadow build (0.1.0a4): DO NOT REPLACE YOUR EXISTING YAML.** The integration subscribes to HA inputs, records *shadow-only* state snapshots and exposes **diagnostic shadow sensors**, never production presence entities. It does **not** modify existing `input_select` values, or control alarm/locks/heating. It has not yet been end-to-end tested inside a running Home Assistant instance.
 
 ## Core behavior
 
@@ -20,7 +20,7 @@ A configurable, multi-person Home Assistant presence FSM using phone zone tracki
 1. Leave the original YAML package and all alarm/heating automations enabled.
 2. Install the contents of `custom_components/family_presence/` under your HA `config/custom_components/family_presence/`. **This branch is experimental, not a release.**
 3. Restart Home Assistant and add **Family Presence** under Settings → Devices & Services. Map the physical inputs and people.
-4. For each existing person, select the corresponding `input_select.presenza_...` helper as **Legacy YAML presence helper**. It seeds the shadow FSM once on startup and is read for diagnostic comparisons; never written.
+4. Optionally select each person's old YAML `input_select` as **Legacy YAML presence helper**, strictly for diagnostic comparison. It **never seeds, modifies or controls** the independent shadow FSM.
 5. The experimental `sensor.family_presence_shadow_...` entities can display the simulated state, last transition/reason, bag-policy conflict and comparison with the corresponding YAML helper. They are marked as **diagnostic**, have `mode: shadow_only`, and **must never be used as automation triggers**.
 6. To see decisions and blocked false arrivals, enable info logs:
 
@@ -33,13 +33,13 @@ A configurable, multi-person Home Assistant presence FSM using phone zone tracki
 
 7. Review log entries `[shadow]` and `[shadow][blocked]`. They are **observations**, not state changes. No alarm automations should be switched over to this integration.
 
-On restart, the integration prefers a **currently valid YAML helper state**. If the persisted shadow state agrees with the valid YAML state and its source mapping still matches, the **previous shadow reason and last-transition timestamp** are restored as historical diagnostics, not synthesized events. The diagnostic attributes `state_origin` and `reason_origin` reveal which source established each. If the helper is missing/unknown, a compatible saved shadow snapshot may instead restore the state, explicitly flagged `restored_from_storage`. A snapshot is accepted only for the **same per-person source mapping and bag policy**. If neither helper nor snapshot is available, state remains unknown until a decisive event. Only state/reason/last-change metadata are stored; **BLE event, gate and door timestamps are intentionally cleared at restart** to avoid accidental reused evidence. A valid bag OFF constraint is reconciled on startup.
+**Independent FSM and restart semantics:** the old YAML reference is display-only (`legacy_state`/`matches_legacy`) and never initializes the FSM, changes its state or authorizes a transition. The FSM decides from its configured phone/Watch/bag/physical sources and stores **its own state, reason and last-change time**. After a restart, a compatible saved shadow snapshot restores those fields regardless of whether the old YAML agrees. Restored occupancy remains marked `restored_from_storage` and is not proof for the internal `all_away=True` verdict. Without a valid saved snapshot the person starts `unknown` until a decisive observed event (or confirmed absent bag at startup). The source mapping and bag policy must match; changing only the legacy comparator no longer invalidates snapshots. Old format-1 snapshots are migrated. BLE/gate/door event history is intentionally **not restored**.
 
 ## Configuration policy: limited flexibility
 
 Under **Settings → Devices & Services → Family Presence → Configure**:
 - **Event correlation windows:** adjust the six gate/door/lock evidence windows. Values remain seconds, with the original YAML defaults.
-- **Backpack priority:** choose a member with a configured bag, then select `always` (strict absence priority) or `legacy` (original YAML morning-only bag departure). Overrides live in the entry's options and automatically reload the **shadow** integration without deleting the entry.
+- **Backpack priority:** choose a member with a bag, then **Priorità assoluta** (bag OFF forces AWAY at any time) or **Fascia scolastica** (old weekday 07:00–09:10 bag exit rule). The internal `always`/`legacy` values remain for compatibility; the UI and diagnostic `bag_policy` attribute now show Italian labels, with `bag_policy_code` carrying the stable raw value. Changes automatically reload the shadow integration.
 
 Core FSM states, decision/event types, precedence between phone/Watch/physical inputs, and the two-second Watch observation delay remain in code, not user-defined expressions. The upstream Beacon BLE and Watch BLE absence timeouts are adjusted **only** in their respective integrations. Use **Reconfigure** on the integration entry (separate from Configure) to change shared entrance sensors, edit a member's mapped phone/Watch/bag/reference, add a member or remove a member. Each member keeps a stable internal ID and duplicated personal sources are rejected.
 
@@ -49,6 +49,7 @@ Core FSM states, decision/event types, precedence between phone/Watch/physical i
 
 - `custom_components/family_presence/fsm.py`: pure transition rules.
 - `custom_components/family_presence/coordinator.py`: per-person serialized decisions, timestamp evidence, revisions, source fingerprinting and state snapshot export/restore.
+- `custom_components/family_presence/labels.py`: Italian human-readable decision reasons and backpack policies (without changing stored backend values).
 - `custom_components/family_presence/sensor.py`: read-only simulated presence state and diagnostic attributes (not for automations).
 - `custom_components/family_presence/sources.py`: HA source subscriptions and normalization.
 - `custom_components/family_presence/config_flow.py`: household/person mapping and options.
@@ -59,7 +60,8 @@ Core FSM states, decision/event types, precedence between phone/Watch/physical i
 - `docs/architecture.md`: architecture, transition semantics and migration roadmap.
 - `docs/shadow-test-plan.md`: safe real-world installation and validation checklist.
 - `docs/alpha2-install.md`: Home Assistant helper-category fix and instructions for testing alpha 2.
-- `docs/alpha3-restart.md`: Alpha 3 reason-restoration fix, test cases and installation instructions.
+- `docs/alpha3-restart.md`: historical Alpha 3 restart diagnosis.
+- `docs/alpha4-independence.md`: independent FSM persistence, Italian diagnostics and Alpha 4 upgrade.
 - `tests/`: pure unit tests; run `python -m unittest discover -s tests -v`.
 - `.github/workflows/validate.yml`: unit tests, hassfest and HACS validation.
 

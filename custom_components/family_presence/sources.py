@@ -22,6 +22,7 @@ from .const import (
 )
 from .coordinator import PersonSources, ShadowBlocked, ShadowCoordinator, ShadowDecision, Windows
 from .fsm import BagPolicy, Event
+from .labels import reason_label
 
 _LOGGER = logging.getLogger(__name__)
 _INVALID = frozenset(("unknown", "unavailable"))
@@ -62,7 +63,7 @@ def _person_specs(
 
 
 def build_coordinator(hass: HomeAssistant, entry: Any) -> ShadowCoordinator:
-    """Seed each shadow state from an optional legacy input_select."""
+    """Build independent shadow FSM; legacy input_select is a comparison only."""
     config, options = entry.data, entry.options
     defaults = Windows()
     window_data = {
@@ -81,7 +82,7 @@ def build_coordinator(hass: HomeAssistant, entry: Any) -> ShadowCoordinator:
         _LOGGER.info(
             "[shadow] %s: %s -> %s via %s (%s); baseline=%s",
             d.person, d.previous, d.current, d.event.value,
-            d.reason, d.reference,
+            reason_label(d.reason), d.reference,
         )
         if d.near_home_duration_seconds is not None:
             _LOGGER.info(

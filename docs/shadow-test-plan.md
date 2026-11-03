@@ -7,8 +7,8 @@ Family Presence is experimental. **Do not remove the existing YAML package, rewi
 1. Back up your Home Assistant configuration, including `.storage` and the legacy YAML.
 2. Install only the current draft `custom_components/family_presence/` as an experimental custom integration; do not treat the branch as a HACS release. Restart HA.
 3. Add **Family Presence** from Devices & Services. Map common gate switch(es), door opening contact, door lock and optional armed-away alarm entity; set one member at a time.
-4. For each existing family member, map their phone `device_tracker`, Watch `binary_sensor`, optional backpack `binary_sensor`, and the relevant legacy `input_select` reference. Use the actual entities visible in your HA installation; examples do not include private entity IDs.
-5. For members with a backpack, choose `always` if you want confirmed bag absence to override Watch/phone and the shared gate; choose `legacy` to compare the original YAML behavior. Absence timeouts remain in Beacon BLE Presence / Watch BLE Presence.
+4. For each person map their phone `device_tracker`, Watch `binary_sensor`, optional bag `binary_sensor`, and optionally the previous YAML `input_select` for **comparison only**, never for seeding or driving the FSM. Use actual entities visible in your Home Assistant instance; no private IDs appear here.
+5. For people with a backpack choose **Priorità assoluta** (bag OFF veto at all hours) or **Fascia scolastica** (bag departure during weekdays 07:00–09:10). Underlying stored values remain `always`/`legacy`. BLE absence timeouts belong in the separate providers.
 6. In the integration's **Configure** menu, verify the default window values (exit gate=120s, door=90s, lock=90s; entry gate/door/unlock=120s). **Reconfigure** changes source entities and household members without recreating the entry.
 7. To include simulated decisions in logbook diagnostics, enable an INFO logger for `custom_components.family_presence` via Home Assistant's logger configuration. **Never include raw IRKs, iBeacon identifiers, access tokens or your private URL in issue reports.**
 
@@ -25,10 +25,11 @@ Family Presence is experimental. **Do not remove the existing YAML package, rewi
 | Old gate/door evidence after HA restart | Cannot be replayed as an arrival |
 | Bag starts up `unavailable→off` | Reconcile priority only, not a synthetic physical off-event |
 | Rename member / swap selected Watch / remove member | Shadow configuration reloads; stable identity remains for a rename and stale evidence is not inherited across changed source mappings |
-| Previously saved shadow `away` with no valid live legacy helper | Internal all-away is **unknown**, not confirmed true |
-| Restart when valid YAML and saved shadow both say `away` | Preserve old shadow `reason` and last transition; `reason_origin` becomes `saved_snapshot_matched_legacy`, no new exit event |
-| Restart when YAML and saved shadow disagree | Keep YAML state; do **not** attribute a stale cause to it; `reason_origin=not_recorded` |
-| Restart when no matching snapshot reason exists | State may still be correct; `reason` stays empty, never fabricated |
+| Saved shadow `away` after restart, with or without valid YAML | State and previous explanation restored from shadow; internal all-away remains **unknown**, not certainly true |
+| Restart when YAML and saved shadow disagree | Keep the **shadow-owned state and reason**; expose disagreement through `matches_legacy=false` only |
+| Fresh install without a compatible shadow snapshot | Shadow state starts `unknown` until a source event or strict bag absence establishes an independent state |
+| Restart when no saved reason exists | Keep the independent saved state, but `reason` stays empty rather than being invented |
+| Change only the mapped old YAML comparison helper | New format-2 shadow snapshot remains compatible and independent |
 
 Caution: the strict bag veto takes effect only after the *upstream* bag sensor actually reports `off`. A physically absent bag may remain `on` for about three minutes. Watch BLE has its own configured 15s polling / 180s timeout. A shared condominium gate event is corroboration, not identity.
 

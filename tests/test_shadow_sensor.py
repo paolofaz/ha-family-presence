@@ -80,12 +80,42 @@ class ShadowSensorTests(unittest.IsolatedAsyncioTestCase):
         sensor = self.cls("entry", after, "person")
         self.assertEqual(sensor.native_value, "away")
         attrs = sensor.extra_state_attributes
-        self.assertEqual(attrs["reason"], "iPhone left home zone")
-        self.assertEqual(attrs["state_origin"], "legacy_reference")
-        self.assertEqual(attrs["reason_origin"], "saved_snapshot_matched_legacy")
-        self.assertFalse(attrs["restored_from_storage"])
+        self.assertEqual(attrs["reason"], "iPhone uscito dalla zona casa")
+        self.assertEqual(attrs["state_origin"], "saved_shadow_unverified")
+        self.assertEqual(attrs["reason_origin"], "saved_snapshot_unverified")
+        self.assertTrue(attrs["restored_from_storage"])
         self.assertTrue(attrs["matches_legacy"])
         self.assertEqual(attrs["mode"], "shadow_only")
+
+    async def test_yaml_can_disagree_without_rewriting_shadow(self):
+        before = self.new()
+        await before.process("person", Event.IPHONE_LEFT, event_time=self.now)
+        self.s["legacy"] = "home"
+        after = self.new()
+        after.restore_snapshot(before.snapshot())
+        sensor = self.cls("entry", after, "person")
+        self.assertEqual(sensor.native_value, "away")
+        self.assertEqual(sensor.extra_state_attributes["legacy_state"], "home")
+        self.assertIs(sensor.extra_state_attributes["matches_legacy"], False)
+        self.assertEqual(sensor.extra_state_attributes["reason"],
+                         "iPhone uscito dalla zona casa")
+        self.s["legacy"] = "away"
+        self.assertEqual(sensor.native_value, "away")
+        self.assertIs(sensor.extra_state_attributes["matches_legacy"], True)
+
+    async def test_bag_policy_is_displayed_in_italian_without_changing_code(self):
+        engine = self.new()
+        sensor = self.cls("entry", engine, "person")
+        attrs = sensor.extra_state_attributes
+        self.assertIsNone(attrs["bag_policy"])  # No bag is configured for this person.
+        self.assertIsNone(attrs["bag_policy_code"])
+        with_bag = ShadowCoordinator(
+            [PersonSources("bag_person", "Member", bag="binary_sensor.bag")],
+            read_state=self.s.get, clock=lambda: self.now,
+        )
+        attrs = self.cls("entry", with_bag, "bag_person").extra_state_attributes
+        self.assertEqual(attrs["bag_policy"], "Priorità assoluta")
+        self.assertEqual(attrs["bag_policy_code"], "always")
 
     async def test_diagnostic_reports_missing_reason_instead_of_inventing_it(self):
         coordinator = self.new()
@@ -93,7 +123,7 @@ class ShadowSensorTests(unittest.IsolatedAsyncioTestCase):
         attrs = sensor.extra_state_attributes
         self.assertIsNone(attrs["reason"])
         self.assertEqual(attrs["reason_origin"], "not_recorded")
-        self.assertEqual(attrs["state_origin"], "legacy_reference")
+        self.assertEqual(attrs["state_origin"], "unknown")
 
 
 if __name__ == "__main__":

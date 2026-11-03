@@ -24,8 +24,8 @@ Only **backpack precedence** is exposed as an explicit behavioral policy, and on
 
 | Policy | Semantics |
 | --- | --- |
-| `always` (default) | If the current bag is definitively off, person must be away. A real off→on transition sets home; bag already on is not a home lock. |
-| `legacy` | Matches the previous YAML: bag on sets home; bag off sets away only in the weekday 07:00–09:10 local window, and other sources can override. |
+| **Priorità assoluta** (stored as `always`, default) | A currently OFF bag forces away, any time; a real off→on arrival sets home; a bag already on is not a home lock. |
+| **Fascia scolastica** (stored as `legacy`) | Original weekday 07:00–09:10 bag departure, without an always-on veto. Other sources may override. |
 
 Go to **Configure → Backpack priority → choose person → choose policy**. A policy change is stored in `entry.options["bag_policies"][person_id]`, without altering person source identifiers. `OptionsFlowWithReload` reloads the shadow integration so it becomes active. Previous early config entries without `person_id` use a normalized name key for compatibility.
 
@@ -33,7 +33,7 @@ Go to **Configure → Backpack priority → choose person → choose policy**. A
 
 **Configure** changes policy/settings (`entry.options`): six correlation windows and per-person bag precedence. **Reconfigure** changes setup data (`entry.data`): household name/common physical entities and the set of people and their source entity mappings. Reconfigure uses the existing entry's unique ID and reloads it; it never creates a second entry or edits YAML.
 
-New members receive stable IDs independent of their names. For early name-based entries, the first edit freezes the original normalized key into `person_id` to prevent a rename from changing entity identity. Source remapping invalidates stale shadow snapshots via the per-person fingerprint and reseeds from valid legacy YAML reference states when available.
+New members receive stable IDs independent of their names. For early name-based entries, the first edit freezes the original normalized key into `person_id` to prevent a rename from changing entity identity. Source remapping invalidates stale shadow snapshots via a source-and-policy fingerprint; a change to the **read-only YAML comparison helper does not**. The engine never seeds from legacy YAML. New setups with no saved state start unknown until their own evidence arrives.
 
 ## Deliberately not configurable yet
 

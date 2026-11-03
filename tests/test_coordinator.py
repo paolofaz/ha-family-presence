@@ -21,16 +21,43 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.sleep = instant_sleep
 
     def engine(self, *, policy=BagPolicy.ALWAYS, reference="ref", people=None):
-        return ShadowCoordinator(
-            people or [PersonSources(
-                key="child", name="Child", iphone="phone", watch="watch",
-                bag="bag", reference=reference, bag_policy=policy,
-            )],
+        specs = people or [PersonSources(
+            key="child", name="Child", iphone="phone", watch="watch",
+            bag="bag", reference=reference, bag_policy=policy,
+        )]
+        coordinator = ShadowCoordinator(
+            specs,
             read_state=lambda key: self.inputs.get(key),
             clock=lambda: self.now,
             sleep=self.sleep,
             local_timezone=ZoneInfo("Europe/Rome"),
         )
+        # Explicit test-fixture precondition: old tests exercise transitions
+        # from an assumed state. PRODUCTION NEVER reads YAML to seed the FSM.
+        for p in specs:
+            seed = parse_state(self.inputs.get(p.reference)) if p.reference else None
+            if seed is not None:
+                coordinator.runtime[p.key].state = seed
+                coordinator.runtime[p.key].state_origin = "test_fixture"
+        return coordinator
+
+    async def test_new_coordinator_never_reads_legacy_helper_for_state(self):
+        readings = {"ref": "home", "bag": "on", "phone": "not_home"}
+        engine = ShadowCoordinator(
+            [PersonSources("test", "Member", iphone="phone", bag="bag", reference="ref")],
+            read_state=readings.get,
+            clock=lambda: self.now,
+            sleep=self.sleep,
+        )
+        self.assertIsNone(engine.state("test"))
+        self.assertIsNone(engine.all_away())
+        readings["ref"] = "away"
+        engine.notify_source_update("test")
+        self.assertIsNone(engine.state("test"))
+        await engine.process("test", Event.IPHONE_LEFT, event_time=self.now)
+        self.assertEqual(engine.state("test"), State.AWAY)
+        readings["ref"] = "home"
+        self.assertEqual(engine.state("test"), State.AWAY)
 
     async def test_bag_absent_wins_over_neighbor_gate_and_watch(self):
         c = self.engine()

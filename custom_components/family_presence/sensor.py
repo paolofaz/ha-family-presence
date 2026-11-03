@@ -7,6 +7,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import ShadowCoordinator
+from .labels import bag_policy_label, reason_label
 
 
 async def async_setup_entry(
@@ -48,7 +49,7 @@ class ShadowPersonSensor(SensorEntity):
         return {
             "mode": "shadow_only",
             "do_not_use_for_automations": True,
-            "reason": rt.last_reason,
+            "reason": reason_label(rt.last_reason),
             "reason_origin": rt.reason_origin,
             "state_origin": rt.state_origin,
             "last_transition": rt.last_changed.isoformat() if rt.last_changed else None,
@@ -57,7 +58,8 @@ class ShadowPersonSensor(SensorEntity):
             ),
             "restored_from_storage": rt.restored_from_storage,
             "bag_state": bag,
-            "bag_policy": p.bag_policy.value,
+            "bag_policy": bag_policy_label(p.bag_policy) if p.bag else None,
+            "bag_policy_code": p.bag_policy.value if p.bag else None,
             "legacy_state": legacy,
             "matches_legacy": (
                 rt.state.value == legacy

@@ -171,6 +171,18 @@ class OptionsFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["step_id"], "bag_policy")
         self.assertEqual(result["description_placeholders"]["person"], "Child")
 
+    async def test_bag_policy_choices_have_clear_italian_labels(self):
+        flow = self.new()
+        await flow.async_step_bag_person({"person": "child-id"})
+        form = await flow.async_step_bag_policy()
+        self.assertEqual(
+            form["schema"]["bag_policy"],
+            {
+                "always": "Priorità assoluta",
+                "legacy": "Fascia scolastica (lun–ven 07:00–09:10)",
+            },
+        )
+
     async def test_bag_policy_updates_only_selected_person(self):
         flow = self.new()
         await flow.async_step_bag_person({"person": "child-id"})

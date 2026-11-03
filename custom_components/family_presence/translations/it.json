@@ -15,14 +15,14 @@
       },
       "person": {
         "title": "Componente della famiglia",
-        "description": "Seleziona almeno una fonte di presenza per persona.",
+        "description": "Associa almeno un sensore. Il vecchio YAML è facoltativo e serve soltanto per confrontare gli stati.",
         "data": {
           "person_name": "Nome",
           "iphone_tracker": "Tracker telefono (facoltativo)",
           "watch_sensor": "Sensore BLE indossabile (facoltativo)",
           "bag_sensor": "Sensore zaino (facoltativo)",
-          "bag_policy": "Priorità zaino assente (always / legacy)",
-          "legacy_presence_entity": "Stato FSM YAML attuale (facoltativo, solo confronto)"
+          "bag_policy": "Comportamento dello zaino (priorità assoluta / fascia scolastica)",
+          "legacy_presence_entity": "Stato FSM YAML precedente (facoltativo, SOLO confronto)"
         }
       },
       "another": {
@@ -129,10 +129,10 @@
         }
       },
       "bag_policy": {
-        "title": "Precedenza dello zaino",
-        "description": "Imposta il comportamento dello zaino per {person}. always: zaino assente vince sempre; legacy: comportamento YAML originale. Lo zaino presente non blocca mai lo stato home.",
+        "title": "Regola dello zaino",
+        "description": "Imposta la regola per {person}. Priorità assoluta: zaino assente impone away a ogni ora. Fascia scolastica: uscita dello zaino rilevante solo dal lunedì al venerdì, 07:00–09:10. Lo zaino presente non blocca home.",
         "data": {
-          "bag_policy": "Regola dello zaino"
+          "bag_policy": "Comportamento"
         }
       }
     },

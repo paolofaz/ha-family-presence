@@ -2,11 +2,11 @@
 
 ## Rules agreed for design
 
-1. **Bag currently OFF ⇒ AWAY** in strict (`always`) mode, irrespective of phone, Watch, gate or door. This is a continuing guard, not merely a one-time departure event.
+1. **Bag currently OFF ⇒ AWAY** in **Priorità assoluta** mode (stored as `always`), irrespective of phone, Watch, gate or door. This is a continuing guard, not merely a one-time departure event.
 2. **Bag OFF → ON ⇒ HOME**: an actual, validated sensor transition confirms the arrival.
 3. **Bag already ON ⇒ no precedence**: phone/Watch and existing FSM can change the person to AWAY. Bag presence does not continually force HOME.
 4. **Bag UNKNOWN/UNAVAILABLE** must not be interpreted as OFF. A sensor recovering to OFF may re-apply the absence guard, but its recovery alone is not a new arrival.
-5. `legacy` mode remains available per person, retaining weekday morning bag departures and allowing phone/Watch to override. The option can now be changed for a specific person from Family Presence → Configure; the shadow coordinator reloads.
+5. **Fascia scolastica** mode (stored as `legacy`) remains available per person, retaining weekday morning bag departures and allowing phone/Watch to override. The option can now be changed for a specific person from Family Presence → Configure; the shadow coordinator reloads.
 
 ## Interaction with the BLE provider
 

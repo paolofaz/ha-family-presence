@@ -15,14 +15,14 @@
       },
       "person": {
         "title": "Household member",
-        "description": "Configure at least one presence source per person.",
+        "description": "Map at least one source. The old YAML helper is optional and used only to compare states.",
         "data": {
           "person_name": "Person name",
           "iphone_tracker": "Phone tracker (optional)",
           "watch_sensor": "BLE wearable sensor (optional)",
           "bag_sensor": "Bag sensor (optional)",
-          "bag_policy": "Bag absence priority (always / legacy)",
-          "legacy_presence_entity": "Legacy YAML presence helper (optional, shadow comparison only)"
+          "bag_policy": "Backpack rule (absolute priority / school-hours)",
+          "legacy_presence_entity": "Previous YAML FSM state (optional, comparison ONLY)"
         }
       },
       "another": {
@@ -129,10 +129,10 @@
         }
       },
       "bag_policy": {
-        "title": "Backpack precedence",
-        "description": "Choose bag precedence for {person}. always: confirmed bag absence wins; legacy: original YAML behavior. A present bag never locks the person at home.",
+        "title": "Backpack rule",
+        "description": "Choose the backpack rule for {person}. Absolute priority: absent bag forces away at any time. School-hours: bag exit matters only Monday–Friday, 07:00–09:10. A present bag never locks home.",
         "data": {
-          "bag_policy": "Backpack policy"
+          "bag_policy": "Behavior"
         }
       }
     },

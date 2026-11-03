@@ -97,6 +97,9 @@ class SourceAdapterTests(unittest.IsolatedAsyncioTestCase):
             sleep=immediate_sleep,
             clock=lambda: self.now,
         )
+        # Explicit fixture setup; the live coordinator never seeds from YAML.
+        self.engine.runtime["child"].state = State.AWAY
+        self.engine.runtime["child"].state_origin = "test_fixture"
         self.adapter = self.mod.ShadowSourceAdapter(
             self.hass,
             {"gate_entities": ["switch.gate"], "door_contact": "binary_sensor.door",

@@ -58,11 +58,11 @@ class PersonRuntime:
     state: State | None = None
     last_reason: str | None = None
     last_changed: datetime | None = None
-    # Seeded near_home has unknown age; only newly observed entries have a timer.
+    # Restored near_home has unknown age; only newly observed entries have a timer.
     near_home_entered_at: datetime | None = None
     restored_from_storage: bool = False
-    # State and reason have different provenance: a live YAML reference can
-    # establish state while a compatible snapshot supplies historical *reason*.
+    # State and reason belong exclusively to the independent FSM.
+    # The legacy YAML reference is never used to seed or reconcile runtime.
     state_origin: str = "unknown"
     reason_origin: str = "not_recorded"
     last_blocked_event: Event | None = None
@@ -114,13 +114,10 @@ class ShadowCoordinator:
         self.people = {p.key: p for p in people}
         if len(self.people) != len(people):
             raise ValueError("Person identifiers must be unique")
+        # Never read a legacy input_select to initialize presence. State and
+        # reason are owned by this FSM, not by the comparison baseline.
         self.runtime: dict[str, PersonRuntime] = {
-            p.key: PersonRuntime(
-                state=seed,
-                state_origin="legacy_reference" if seed is not None else "unknown",
-            )
-            for p in people
-            for seed in [parse_state(read_state(p.reference)) if p.reference else None]
+            p.key: PersonRuntime() for p in people
         }
         self._physical: dict[str, datetime] = {}
         self._read = read_state
@@ -147,82 +144,76 @@ class ShadowCoordinator:
         self._notify(person)
 
     @staticmethod
-    def _fingerprint(person: PersonSources) -> str:
-        """Reject snapshots from prior source maps or changed bag policies."""
+    def _fingerprint(person: PersonSources, *, legacy: bool = False) -> str:
+        """Fingerprint only FSM inputs, not the read-only YAML comparator.
+
+        Alpha 1–3 stored the comparator in the fingerprint. Accept that older
+        format once during migration, while the new format remains independent
+        of any changes to the baseline helper.
+        """
         mapping = {
-            "iphone": person.iphone, "watch": person.watch,
-            "bag": person.bag, "reference": person.reference,
+            "iphone": person.iphone,
+            "watch": person.watch,
+            "bag": person.bag,
             "bag_policy": person.bag_policy.value,
         }
+        if legacy:
+            mapping["reference"] = person.reference
         return hashlib.sha256(
             json.dumps(mapping, sort_keys=True).encode("utf-8")
         ).hexdigest()
 
     def snapshot(self) -> dict[str, Any]:
-        """Serializable shadow state only, never BLE observations or keys."""
+        """Serialize only shadow-owned state and diagnostic explanation."""
         return {
-            "format": 1,
+            "format": 2,
             "people": {
                 key: {
                     "fingerprint": self._fingerprint(self.people[key]),
                     "state": rt.state.value if rt.state is not None else None,
                     "reason": rt.last_reason,
-                    "last_changed": rt.last_changed.isoformat() if rt.last_changed else None,
+                    "last_changed": (
+                        rt.last_changed.isoformat() if rt.last_changed else None
+                    ),
                 }
                 for key, rt in self.runtime.items()
             },
         }
 
     def restore_snapshot(self, data: Any) -> int:
-        """Restore state and/or diagnostic reason from a compatible snapshot.
+        """Recover FSM-owned state/reason regardless of the legacy YAML state.
 
-        A valid live YAML helper has priority for STATE. If the saved shadow
-        state agrees with it, retain the saved cause and timestamp too. A
-        disagreeing or reconfigured snapshot must NOT attribute a stale cause
-        to the current state. Without a usable YAML reference, the snapshot
-        may recover state but is explicitly marked unverified for all-away.
-
-        Physical events and provisional near-home durations NEVER survive
-        restart. The return value counts state restored without a reference,
-        not diagnostic metadata restored with an agreeing reference.
+        Legacy references are display-only. A previously saved state is not
+        immediately verified as fresh occupancy after startup and cannot by
+        itself establish all-away. Do not restore physical event timestamps or
+        infer a near_home age. Version 1 snapshots are supported for upgrade.
         """
-        if not isinstance(data, dict) or data.get("format") != 1:
+        if not isinstance(data, dict) or data.get("format") not in (1, 2):
             return 0
         people = data.get("people")
         if not isinstance(people, dict):
             return 0
+        legacy = data["format"] == 1
         restored = 0
         for key, rt in self.runtime.items():
-            config = self.people[key]
             record = people.get(key)
             if not isinstance(record, dict):
                 continue
-            if record.get("fingerprint") != self._fingerprint(config):
+            if record.get("fingerprint") != self._fingerprint(
+                self.people[key], legacy=legacy
+            ):
                 continue
             saved_state = parse_state(record.get("state"))
             if saved_state is None:
                 continue
-
-            # Seeded from the live reference in __init__: don't replace a
-            # known reference state or its occupancy confidence with storage.
-            reference_state = rt.state
-            if reference_state is not None:
-                if saved_state != reference_state:
-                    continue  # Saved reason would describe a DIFFERENT state.
-                rt.state_origin = "legacy_reference"
-                rt.restored_from_storage = False
-                reason_origin = "saved_snapshot_matched_legacy"
-            else:
-                rt.state = saved_state
-                rt.state_origin = "saved_shadow_unverified"
-                rt.restored_from_storage = True
-                reason_origin = "saved_snapshot_unverified"
-                restored += 1
+            rt.state = saved_state
+            rt.state_origin = "saved_shadow_unverified"
+            rt.restored_from_storage = True
 
             reason = record.get("reason")
             if isinstance(reason, str) and reason.strip():
                 rt.last_reason = reason
-                rt.reason_origin = reason_origin
+                rt.reason_origin = "saved_snapshot_unverified"
             else:
                 rt.last_reason = None
                 rt.reason_origin = "not_recorded"
@@ -235,6 +226,7 @@ class ShadowCoordinator:
                 except ValueError:
                     pass
             rt.near_home_entered_at = None
+            restored += 1
         return restored
 
     def note_person_event(self, person: str) -> int:

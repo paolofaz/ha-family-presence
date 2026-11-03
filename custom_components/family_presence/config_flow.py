@@ -21,6 +21,7 @@ from .const import (
     CONF_WATCH, DEFAULT_WINDOWS, DOMAIN,
 )
 from .fsm import BagPolicy
+from .labels import BAG_POLICY_CHOICES_IT
 
 
 def entity(domain: str) -> EntitySelector:
@@ -42,9 +43,7 @@ PERSON_SCHEMA = vol.Schema({
     vol.Optional(CONF_WATCH): entity("binary_sensor"),
     vol.Optional(CONF_BAG): entity("binary_sensor"),
     vol.Optional(CONF_REFERENCE): entity("input_select"),
-    vol.Optional(CONF_BAG_POLICY, default=BagPolicy.ALWAYS.value): vol.In(
-        [BagPolicy.ALWAYS.value, BagPolicy.LEGACY.value]
-    ),
+    vol.Optional(CONF_BAG_POLICY, default=BagPolicy.ALWAYS.value): vol.In(BAG_POLICY_CHOICES_IT),
 })
 # Source mapping belongs to Reconfigure, behavioral choices to Configure.
 PERSON_RECONFIGURE_SCHEMA = vol.Schema({
@@ -379,7 +378,7 @@ class FamilyPresenceOptionsFlow(OptionsFlowWithReload):
                     step_id="bag_policy",
                     data_schema=vol.Schema({
                         vol.Required(CONF_BAG_POLICY, default=default):
-                            vol.In([BagPolicy.ALWAYS.value, BagPolicy.LEGACY.value])
+                            vol.In(BAG_POLICY_CHOICES_IT)
                     }),
                     errors={CONF_BAG_POLICY: "invalid_policy"},
                 )
@@ -394,7 +393,7 @@ class FamilyPresenceOptionsFlow(OptionsFlowWithReload):
             step_id="bag_policy",
             data_schema=vol.Schema({
                 vol.Required(CONF_BAG_POLICY, default=default):
-                    vol.In([BagPolicy.ALWAYS.value, BagPolicy.LEGACY.value])
+                    vol.In(BAG_POLICY_CHOICES_IT)
             }),
             description_placeholders={"person": person[CONF_PERSON_NAME]},
         )
