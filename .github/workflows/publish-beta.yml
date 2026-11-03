@@ -1,0 +1,69 @@
+name: Publish validated beta
+
+on:
+  push:
+    branches:
+      - chore/hacs-ready-foundation
+    paths:
+      - custom_components/family_presence/manifest.json
+      - .github/workflows/publish-beta.yml
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m unittest discover -s tests -v
+      - run: python -m compileall -q custom_components tests
+
+  validate-hacs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration
+
+  hassfest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  release:
+    needs: [unit-tests, validate-hacs, hassfest]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        name: Verify beta version
+        shell: bash
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          with open("custom_components/family_presence/manifest.json", encoding="utf-8") as file:
+              version = json.load(file)["version"]
+          print("publish=" + ("true" if version == "0.1.0b1" else "false"))
+          print("tag=v" + version)
+          PY
+      - name: Publish Beta 1 prerelease
+        if: steps.version.outputs.publish == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Prerelease $TAG already exists; nothing to publish."
+            exit 0
+          fi
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --title "Family Presence $TAG (Beta Shadow)" \
+            --prerelease \
+            --notes-file docs/beta1-field-test.md
