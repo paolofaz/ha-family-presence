@@ -153,6 +153,29 @@ class ShadowCoordinator:
         self.report_block = report_block
         self.report_ignore = report_ignore
         self._listeners: set[Callable[[str], None]] = set()
+        # Since the current runtime started; this does not gate any FSM state.
+        self.parity_status = "not_configured"
+        self.parity_diverged_since: datetime | None = None
+        self._refresh_parity_comparison()
+
+    def legacy_comparison(self):
+        """Read-only aggregation from explicitly mapped old YAML helpers."""
+        from .comparison import compare_legacy
+
+        return compare_legacy(self)
+
+    def _refresh_parity_comparison(self) -> None:
+        """Track the start of an uninterrupted, verifiable disagreement."""
+        status = self.legacy_comparison().status
+        mismatched = status in ("aggregate_divergence", "member_divergence")
+        previously_mismatched = self.parity_status in (
+            "aggregate_divergence", "member_divergence"
+        )
+        if mismatched and not previously_mismatched:
+            self.parity_diverged_since = _aware_utc(self._clock())
+        elif not mismatched:
+            self.parity_diverged_since = None
+        self.parity_status = status
 
     def async_add_listener(self, listener: Callable[[str], None]) -> Callable[[], None]:
         """Register local shadow updates for diagnostic entities and storage."""
@@ -160,6 +183,8 @@ class ShadowCoordinator:
         return lambda: self._listeners.discard(listener)
 
     def _notify(self, person: str) -> None:
+        # Includes updates to mapped YAML references, not just FSM transitions.
+        self._refresh_parity_comparison()
         for listener in tuple(self._listeners):
             listener(person)
 
@@ -292,10 +317,10 @@ class ShadowCoordinator:
     def restore_snapshot(self, data: Any) -> int:
         """Recover FSM-owned state/reason regardless of the legacy YAML state.
 
-        Legacy references are display-only. A previously saved state is not
-        immediately verified as fresh occupancy after startup and cannot by
-        itself establish all-away. Do not restore physical event timestamps or
-        infer a near_home age. Version 1 snapshots are supported for upgrade.
+        Legacy references are display-only. A saved AWAY counts as AWAY for
+        the strict, user-defined all-away aggregate, while source provenance
+        remains visible separately. Do not restore physical event timestamps
+        or infer a near_home age. Version 1 snapshots are supported for upgrade.
         """
         if not isinstance(data, dict) or data.get("format") not in (1, 2, 3, 4, 5):
             return 0
@@ -391,6 +416,8 @@ class ShadowCoordinator:
                         })
             self._refresh_comparison(key)
             restored += 1
+        if restored:
+            self._refresh_parity_comparison()
         return restored
 
     async def force_state(self, person: str, state: State) -> ShadowDecision:
