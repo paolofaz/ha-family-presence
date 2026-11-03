@@ -160,6 +160,8 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         await restored.process("child", Event.BAG_ARRIVED, event_time=self.time)
         self.assertIs(restored.all_away(), False)
         self.values["phone"] = "not_home"
+        # A Watch still detectable near the home cannot prove it is empty.
+        self.values["watch"] = "off"
         await restored.process("child", Event.IPHONE_LEFT, event_time=self.time)
         self.assertIs(restored.all_away(), True)
 
