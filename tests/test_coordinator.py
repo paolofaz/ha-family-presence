@@ -151,6 +151,8 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
         ]
         c = self.engine(people=people)
         self.assertIs(c.all_away(), False)
+        # Only an absent bag can corroborate departure for this bag-only member.
+        self.inputs["p2_bag"] = "off"
         await c.process("p2", Event.IPHONE_LEFT, event_time=self.now)
         self.assertIs(c.all_away(), True)
         unknown = self.engine(people=[PersonSources("p1", "One"), PersonSources("p2", "Two")])
