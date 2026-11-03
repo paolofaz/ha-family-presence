@@ -168,10 +168,10 @@ class ShadowSensorTests(unittest.IsolatedAsyncioTestCase):
 
         await engine.force_state("person", State.AWAY)
         attrs = household.extra_state_attributes
-        self.assertEqual(household.native_value, "indeterminate")
+        self.assertEqual(household.native_value, "all_away")
         self.assertEqual(attrs["member_diagnostics"]["Member"]["reason"],
-                         "away_manuale_non_verificato")
-        self.assertIs(attrs["all_away_internal"], False)
+                         "away_forzato")
+        self.assertIs(attrs["all_away_internal"], True)
 
         self.s["phone"] = "not_home"
         self.now += timedelta(seconds=2)  # New sensor event must follow manual force.
