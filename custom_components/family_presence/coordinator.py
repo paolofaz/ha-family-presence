@@ -520,6 +520,19 @@ class ShadowCoordinator:
             if event not in (Event.RECONCILE, Event.MANUAL_HOME, Event.MANUAL_AWAY):
                 rt.last_source_event_at = at
             result: Decision | None = decide(rt.state, event, evidence)
+
+            # A real newer phone event can corroborate a manually forced or
+            # restored value even when the FSM is already in that same state.
+            # This affects provenance/confidence only; it does not manufacture
+            # a new transition or change the per-person state.
+            unverified = rt.restored_from_storage or rt.state_origin == "manual_force"
+            if result is None and unverified and config.iphone:
+                if (event == Event.IPHONE_LEFT and rt.state == State.AWAY
+                        and evidence.iphone_outside):
+                    result = Decision(State.AWAY, "iPhone left home zone")
+                elif (event == Event.IPHONE_ARRIVED and rt.state == State.HOME
+                      and self._read(config.iphone) == "home"):
+                    result = Decision(State.HOME, "iPhone entered home zone")
             if result is None:
                 if event == Event.RECONCILE:
                     return None  # Boot/recovery must never fabricate a transition.
