@@ -241,10 +241,14 @@ class SourceAdapterTests(unittest.IsolatedAsyncioTestCase):
     async def test_reference_update_refreshes_diagnostics_not_fsm(self):
         notifications = []
         self.engine.async_add_listener(notifications.append)
+        self.engine.notify_source_update("child")
+        self.assertEqual(self.engine.parity_status, "aligned")
         self.inputs["ref"] = "home"
         self.adapter._changed(ha_event("ref", "away", "home", self.now))
         await self.drain()
         self.assertEqual(self.engine.state("child"), State.AWAY)
+        self.assertEqual(self.engine.parity_status, "aggregate_divergence")
+        self.assertIsNotNone(self.engine.parity_diverged_since)
         self.assertIn("child", notifications)
 
     async def test_bag_recovery_is_diagnostic_but_not_a_physical_arrival(self):
