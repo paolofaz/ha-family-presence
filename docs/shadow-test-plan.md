@@ -1,4 +1,4 @@
-# Alpha 6 — field test: persistence, bag schedule and event diagnostics
+# Alpha 7 — field test: persistence, bag schedule and event diagnostics
 
 **Leave the old family YAML package and all alarm/lock/heating automations
 enabled.** Only use diagnostic shadow entities and buttons. Do not use these
@@ -39,3 +39,12 @@ these tests without wiring shadow outputs to any alarm or door automation.
 If a problem occurs, disable Family Presence only; leave the separate BLE
 providers and the original YAML intact. Record anonymized source timestamps,
 states and reasons for any disagreement.
+
+14. Inspect the diagnostic sensor **Family Presence Shadow - Diagnostica casa**.
+    Manually force the last away member: `candidate_empty` must be blocked;
+    after a genuine new source event, it may reappear if live sources agree.
+15. Verify an iPhone showing HOME or a Watch showing ON invalidates a
+    `candidate_empty` report while leaving the person's FSM state unchanged.
+16. Restart with all members previously away: restored states alone must
+    yield `indeterminate` until valid new events occur. Never wire this
+    diagnostic sensor to the alarm.

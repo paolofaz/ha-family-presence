@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sys
 import types
@@ -18,7 +18,7 @@ SENSOR_FILE = (
 )
 
 
-def load_sensor_class():
+def load_sensor_module():
     ha = types.ModuleType("homeassistant")
     components = types.ModuleType("homeassistant.components")
     sensors = types.ModuleType("homeassistant.components.sensor")
@@ -51,7 +51,11 @@ def load_sensor_class():
         module = importlib.util.module_from_spec(spec)
         sys.modules[name] = module
         spec.loader.exec_module(module)
-    return module.ShadowPersonSensor
+    return module
+
+
+def load_sensor_class():
+    return load_sensor_module().ShadowPersonSensor
 
 
 class ShadowSensorTests(unittest.IsolatedAsyncioTestCase):
@@ -142,6 +146,38 @@ class ShadowSensorTests(unittest.IsolatedAsyncioTestCase):
         attrs = sensor.extra_state_attributes
         self.assertEqual(attrs["comparison_status"], "aligned")
         self.assertIsNone(attrs["divergence_since"])
+
+    async def test_household_sensor_is_diagnostic_only_and_reports_blockers(self):
+        module = load_sensor_module()
+        engine = self.new()
+        entry = types.SimpleNamespace(
+            entry_id="entry", runtime_data=types.SimpleNamespace(engine=engine)
+        )
+        registered = []
+        await module.async_setup_entry(None, entry, registered.extend)
+        self.assertEqual(len(registered), 2)
+        household = next(x for x in registered
+                         if isinstance(x, module.ShadowHouseholdSensor))
+        self.assertEqual(household.native_value, "indeterminate")
+        attrs = household.extra_state_attributes
+        self.assertEqual(attrs["mode"], "shadow_only")
+        self.assertTrue(attrs["do_not_use_for_automations"])
+        self.assertTrue(attrs["candidate_empty_is_not_alarm_permission"])
+        self.assertIn("Member", attrs["unresolved_members"])
+        self.assertIsNone(attrs["all_away_internal"])
+
+        await engine.force_state("person", State.AWAY)
+        attrs = household.extra_state_attributes
+        self.assertEqual(household.native_value, "indeterminate")
+        self.assertEqual(attrs["member_diagnostics"]["Member"]["reason"],
+                         "away_manuale_non_verificato")
+        self.assertIsNone(attrs["all_away_internal"])
+
+        self.s["phone"] = "not_home"
+        self.now += timedelta(seconds=2)  # New sensor event must follow manual force.
+        await engine.process("person", Event.IPHONE_LEFT, event_time=self.now)
+        self.assertEqual(household.native_value, "candidate_empty")
+        self.assertIs(household.extra_state_attributes["all_away_internal"], True)
 
     async def test_diagnostic_reports_missing_reason_instead_of_inventing_it(self):
         coordinator = self.new()
