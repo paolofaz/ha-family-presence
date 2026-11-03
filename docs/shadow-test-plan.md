@@ -1,4 +1,4 @@
-# Alpha 8 — field test: persistence, bag schedule and event diagnostics
+# Alpha 9 — field test: persistence, bag schedule and event diagnostics
 
 **Leave the old family YAML package and all alarm/lock/heating automations
 enabled.** Only use diagnostic shadow entities and buttons. Do not use these
@@ -50,3 +50,17 @@ states and reasons for any disagreement.
     but must not override manual force in the aggregate.
 19. Compare the new shadow binary sensor with the production YAML
     `binary_sensor.casa_certamente_vuota`, keeping YAML the sole writer.
+
+20. In the new shadow binary sensor, verify `legacy_comparison_status`,
+    `legacy_expected_all_away`, `aggregate_matches_legacy` and
+    `legacy_differing_members`. These use the mapped old
+    `input_select.presenza_*` references, not the live binary sensor.
+21. When all four shadow and legacy members are AWAY, comparison must be
+    `aligned`. Force one shadow member HOME: comparison should show
+    `aggregate_divergence`; force them AWAY again to clear it.
+22. If the aggregate is OFF in both engines but different people are
+    HOME/AWAY, `member_divergence` must identify the names.
+23. If one old reference helper is missing or unavailable, parity must
+    report `not_configured` or `reference_unavailable` instead of matching.
+24. Confirm `legacy_divergence_since` starts on mismatch and clears on
+    alignment. Never use any shadow entity to trigger the alarm.
