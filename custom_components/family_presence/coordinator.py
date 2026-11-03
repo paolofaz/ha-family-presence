@@ -70,6 +70,7 @@ class PersonRuntime:
     # Manual forcing is a single event, not a hold or priority override.
     manual_last_action: str | None = None
     manual_last_action_at: datetime | None = None
+    last_source_event_at: datetime | None = None
     last_blocked_event: Event | None = None
     last_blocked_at: datetime | None = None
     decisions: list[ShadowDecision] = field(default_factory=list)
@@ -328,6 +329,14 @@ class ShadowCoordinator:
         rt = self.runtime[person]
         async with rt.lock:
             if (
+                rt.last_source_event_at is not None
+                and event not in (Event.RECONCILE, Event.MANUAL_HOME, Event.MANUAL_AWAY)
+                and at < rt.last_source_event_at
+            ):
+                # Older queued sensor callbacks must not override a newer
+                # processed phone/Watch/bag event.
+                return None
+            if (
                 rt.manual_last_action_at is not None
                 and event not in (Event.MANUAL_HOME, Event.MANUAL_AWAY)
                 and at <= rt.manual_last_action_at
@@ -371,6 +380,8 @@ class ShadowCoordinator:
             if event == Event.BAG_ARRIVED and evidence.bag_status != BagStatus.PRESENT:
                 return None
 
+            if event not in (Event.RECONCILE, Event.MANUAL_HOME, Event.MANUAL_AWAY):
+                rt.last_source_event_at = at
             result: Decision | None = decide(rt.state, event, evidence)
             if result is None:
                 return None

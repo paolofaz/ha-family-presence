@@ -156,6 +156,19 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
         unknown = self.engine(people=[PersonSources("p1", "One"), PersonSources("p2", "Two")])
         self.assertIsNone(unknown.all_away())
 
+    async def test_queued_old_bag_off_cannot_override_later_phone_home(self):
+        c = self.engine()
+        c.runtime["child"].state = State.AWAY
+        c.record_physical("gate", self.now)
+        self.inputs["bag"] = "off"
+        await c.process("child", Event.IPHONE_ARRIVED, event_time=self.now)
+        self.assertEqual(c.state("child"), State.HOME)
+        prior_off = self.now - timedelta(seconds=1)
+        self.assertIsNone(
+            await c.process("child", Event.BAG_LEFT, event_time=prior_off)
+        )
+        self.assertEqual(c.state("child"), State.HOME)
+
     async def test_near_home_is_provisional_not_home_or_away(self):
         self.inputs.update({"bag": "on", "ref": "away", "phone": "not_home"})
         c = self.engine()
