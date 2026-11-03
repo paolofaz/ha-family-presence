@@ -375,17 +375,18 @@ class ShadowCoordinator:
                         continue
                     event_name, outcome = item.get("event"), item.get("outcome")
                     at_value, reason = item.get("at"), item.get("reason")
-                    if (event_name in Event._value2member_map_
+                    state_value = item.get("state")
+                    if (isinstance(event_name, str)
+                            and event_name in Event._value2member_map_
                             and outcome in ("ignored", "applied")
                             and isinstance(at_value, str)
-                            and isinstance(reason, str) and len(reason) <= 256):
+                            and isinstance(reason, str) and len(reason) <= 256
+                            and state_value in ("home", "away", "near_home", None)):
                         rt.recent_events.append({
                             "at": at_value,
                             "event": event_name,
                             "outcome": outcome,
-                            "state": record.get("state") if outcome == "applied" else (
-                                item.get("state") if item.get("state") in ("home", "away", "near_home", None) else None
-                            ),
+                            "state": state_value,
                             "reason": reason,
                         })
             self._refresh_comparison(key)
