@@ -46,7 +46,7 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNone(c.state("child"))
                 self.assertIsNone(c.runtime["child"].last_reason)
                 self.assertEqual(c.runtime["child"].state_origin, "unknown")
-                self.assertIsNone(c.all_away())
+                self.assertIs(c.all_away(), False)
                 await c.reconcile()
                 self.assertIsNone(c.state("child"))  # Bag ON proves no state.
 
@@ -65,7 +65,7 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(restarted.runtime["child"].state_origin, "saved_shadow_unverified")
         self.assertEqual(restarted.runtime["child"].reason_origin, "saved_snapshot_unverified")
         self.assertTrue(restarted.runtime["child"].restored_from_storage)
-        self.assertIsNone(restarted.all_away())
+        self.assertIs(restarted.all_away(), True)
         await restarted.reconcile()
         self.assertEqual(restarted.state("child"), State.AWAY)
         self.assertEqual(restarted.runtime["child"].last_reason, "iPhone left home zone")
@@ -118,7 +118,7 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(new_schedule.state("child"), State.AWAY)
         self.assertEqual(new_schedule.runtime["child"].last_reason, "iPhone left home zone")
         self.assertTrue(new_schedule.runtime["child"].restored_from_storage)
-        self.assertIsNone(new_schedule.all_away())
+        self.assertIs(new_schedule.all_away(), True)
 
     async def test_alpha5_format_four_migrates_with_unchanged_schedule(self):
         first = await self.outside()
@@ -144,15 +144,15 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(disabled.restore_snapshot(first.snapshot()), 1)
         self.assertEqual(disabled.state("child"), State.AWAY)
 
-    async def test_stale_snapshot_cannot_make_all_away_true(self):
+    async def test_restored_away_counts_as_away_and_new_events_override_it(self):
         initial = await self.outside()
         self.values["reference"] = "away"
         restored = self.new()
         self.assertEqual(restored.restore_snapshot(initial.snapshot()), 1)
-        self.assertIsNone(restored.all_away())
+        self.assertIs(restored.all_away(), True)
         self.values["bag"] = "off"
         await restored.process("child", Event.RECONCILE, event_time=self.time)
-        self.assertIsNone(restored.all_away())
+        self.assertIs(restored.all_away(), True)
         self.values["phone"] = "home"
         await restored.process("child", Event.IPHONE_ARRIVED, event_time=self.time)
         self.assertIs(restored.all_away(), False)  # A new phone arrival wins over bag OFF.
@@ -160,8 +160,6 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         await restored.process("child", Event.BAG_ARRIVED, event_time=self.time)
         self.assertIs(restored.all_away(), False)
         self.values["phone"] = "not_home"
-        # A Watch still detectable near the home cannot prove it is empty.
-        self.values["watch"] = "off"
         await restored.process("child", Event.IPHONE_LEFT, event_time=self.time)
         self.assertIs(restored.all_away(), True)
 

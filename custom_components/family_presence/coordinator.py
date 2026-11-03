@@ -639,16 +639,13 @@ class ShadowCoordinator:
 
         return assess_household(self)
 
-    def all_away(self) -> bool | None:
-        """Conservative internal tri-state used solely for shadow diagnostics.
+    def all_away(self) -> bool:
+        """Exactly the legacy rule: all configured people must be AWAY.
 
-        Manual AWAY, restored states, source outages and contradictory live
-        signals never establish certain emptiness. This is never an actuator
-        command or a production Home Assistant entity.
+        Manual and restored states count like any other valid FSM state.
+        Unknown/NEAR_HOME/HOME (or zero configured people) yield False.
+        Source disagreement belongs to diagnostics, never to this decision.
         """
-        status = self.household_assessment().status
-        if status == "candidate_empty":
-            return True
-        if status == "presence_indicated":
-            return False
-        return None
+        return bool(self.people) and all(
+            rt.state == State.AWAY for rt in self.runtime.values()
+        )

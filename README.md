@@ -5,7 +5,7 @@ Sources: phone tracker, Watch BLE, optional bag BLE sensor and shared
 gate/door/lock/alarm evidence. The original private family YAML is **not**
 included in this repository.
 
-> **Experimental Alpha 7 (0.1.0a7), shadow-only.** Do not disable the existing
+> **Experimental Alpha 8 (0.1.0a8), shadow-only.** Do not disable the existing
 > YAML presence, alarm, heating or notification automations. Diagnostic states
 > and manual buttons here do not write the original YAML helpers or operate
 > alarms, heating or locks.
@@ -63,23 +63,25 @@ with a bag can configure **enabled**, **start time**, **end time**, and
   `not_configured`; `divergence_since` records the current continuous
   mismatch, with no alerts or alarm actions.
 
-### Alpha 7: household readiness without alarm risk
+### Alpha 8: authoritative all-away aggregate, including manual force
 
-A new diagnostic-only sensor, **Family Presence Shadow - Diagnostica casa**,
-reports `presence_indicated`, `candidate_empty` or `indeterminate`, with a
-per-person blocker in `member_diagnostics` plus `unresolved_members`.
-`candidate_empty` is **never** an alarm-arm permission and must not be used
-for production automations.
+The aggregate **Casa certamente vuota** follows exactly the original YAML
+definition: it is **ON iff every configured member's FSM state is AWAY**.
+A manually forced AWAY is an authoritative AWAY, not a request for new proof.
+A restored AWAY also counts. Any HOME, NEAR_HOME or unknown state makes it
+OFF. The aggregate is False when there are no configured people.
 
-A manually forced AWAY, a restored-but-unverified state, an iPhone reporting
-HOME, a detected Watch, absent usable sources or an ON backpack without
-independent evidence the iPhone is outside block the candidate-empty verdict.
-A genuine new iPhone transition may also corroborate a manually forced or
-restored state that already has the same HOME/AWAY value, without changing the
-person's state. An unavailable iPhone does not provide corroboration.
-This does **not** change the normal HOME/AWAY/NEAR_HOME transition rules;
-it only makes the internal household assessment more conservative. The
-existing YAML remains the sole authority for alarm actions.
+The new `binary_sensor` **Family Presence Shadow - Casa certamente vuota**
+shows these ON/OFF transitions immediately, including manual button presses,
+and remains a diagnostic shadow entity separate from the original
+`binary_sensor.casa_certamente_vuota` controlled by YAML. The diagnostic
+`Family Presence Shadow - Diagnostica casa` sensor explains which state
+determines the result. Contradicting iPhone/Watch readings appear only as
+`source_warnings`, **never as a veto to a manual decision**.
+
+**Do not point alarm/lock/heating automations at the new shadow binary sensor.**
+A separate cutover will be needed after field comparison, when only one FSM
+will be allowed to drive production presence outputs.
 
 ### Manual state forcing: one-off, not a hold
 
@@ -97,7 +99,7 @@ independent shadow state. These buttons do **not** control the alarm or YAML.
 ## Setup and diagnostics
 
 1. Leave the original YAML package and all related automations running.
-2. Install the Alpha 7 prerelease from the development branch when tagged and
+2. Install the Alpha 8 prerelease from the development branch when tagged and
    available through HACS; restart Home Assistant.
 3. Add **Family Presence** under Settings → Devices & Services, and map your
    phone, Watch, optional bag, gate, door, lock and armed-away alarm entities.
@@ -122,7 +124,7 @@ certain absence.
 
 ## Safety / what's next
 
-No production presence entities, no HA `casa_certamente_vuota` output, no
+No production presence entities, no production `casa_certamente_vuota` output, no
 actuator calls and no automatic migration of alarm automations. Field-test the
 schedule boundaries, delayed BLE, overnight time windows, manual buttons, event
 races, restart and all-away confidence before enabling any new production
@@ -130,7 +132,8 @@ output. A manual **Forza fuori casa** may eventually contribute to arming when
 real outputs exist; that workflow requires separate approval and testing.
 
 See [Architecture](docs/architecture.md), [Backpack transitions](docs/bag-policy.md),
-[Alpha 6 field test](docs/alpha6-reliability.md),\n[Alpha 7 safety checks](docs/alpha7-household-safety.md),
+[Alpha 6 field test](docs/alpha6-reliability.md),\n[Alpha 7 history](docs/alpha7-household-safety.md),
+[Alpha 8 authoritative aggregate](docs/alpha8-aggregate.md),
 [Shadow test plan](docs/shadow-test-plan.md) and
 [GitHub PR #1](https://github.com/paolofaz/ha-family-presence/pull/1).
 

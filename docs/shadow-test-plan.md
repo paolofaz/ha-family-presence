@@ -1,4 +1,4 @@
-# Alpha 7 — field test: persistence, bag schedule and event diagnostics
+# Alpha 8 — field test: persistence, bag schedule and event diagnostics
 
 **Leave the old family YAML package and all alarm/lock/heating automations
 enabled.** Only use diagnostic shadow entities and buttons. Do not use these
@@ -40,11 +40,13 @@ If a problem occurs, disable Family Presence only; leave the separate BLE
 providers and the original YAML intact. Record anonymized source timestamps,
 states and reasons for any disagreement.
 
-14. Inspect the diagnostic sensor **Family Presence Shadow - Diagnostica casa**.
-    Manually force the last away member: `candidate_empty` must be blocked;
-    after a genuine new source event, it may reappear if live sources agree.
-15. Verify an iPhone showing HOME or a Watch showing ON invalidates a
-    `candidate_empty` report while leaving the person's FSM state unchanged.
-16. Restart with all members previously away: restored states alone must
-    yield `indeterminate` until valid new events occur. Never wire this
-    diagnostic sensor to the alarm.
+14. Inspect **Family Presence Shadow - Casa certamente vuota**, which must
+    be ON iff all configured people are AWAY. Do not wire it to the alarm.
+15. Force the last HOME person AWAY: shadow binary sensor must immediately
+    turn ON. Force that person HOME: it must immediately turn OFF.
+16. Make the last person's state NEAR_HOME or unknown: aggregate stays OFF.
+17. Restart with all people AWAY: restored AWAY states still yield ON.
+18. Contradictory iPhone/Watch sources may appear under `source_warnings`
+    but must not override manual force in the aggregate.
+19. Compare the new shadow binary sensor with the production YAML
+    `binary_sensor.casa_certamente_vuota`, keeping YAML the sole writer.

@@ -8,13 +8,15 @@ events → `sources.py` (verified state changes/timestamps) →
 `fsm.py` (three-state deterministic transitions) →
 diagnostic-only `sensor.py`, one-off `button.py`, private HA Store snapshot.
 
-A fifth, diagnostic-only household sensor reports `presence_indicated`,
-`candidate_empty` or `indeterminate` with a reason per person. Even
-`candidate_empty` is a **shadow hypothesis**, not a production permission
-to arm an alarm. A manual force-AWAY, a restored state, an iPhone still
-`home`, a Watch still detected, or missing source availability prevents
-`candidate_empty`. An active bag ON without independent iPhone-outside
-evidence also prevents that claim. Manual HOME blocks an empty-house verdict.
+The diagnostic-only aggregate binary sensor replicates the legacy YAML
+truth table: `on` iff every configured person's state is `away`. Manual
+force AWAY and restored AWAY count as authoritative states. HOME, NEAR_HOME
+and unknown always make the aggregate `off`. Live source contradictions
+and YAML differences are tracked as diagnostic warnings only, not vetoes.
+The independent diagnostic household sensor explains current state inputs.
+
+Both sensors are shadow-only. No production all-away entity exists in this
+integration, and the original YAML still owns the real `casa_certamente_vuota`.
 
 The original YAML `input_select` is optional and read for
 `legacy_state`/`matches_legacy` only. No old YAML helper seeds, overrides or
@@ -62,12 +64,10 @@ No previous physical gate/door events are restored.
 
 Restored states are marked `restored_from_storage`. A per-person diagnostic
 records ignored input events and tracks YAML/shadow mismatches without
-changing FSM decisions. The conservative internal
-`all_away()` does not return true based solely on saved away states, and
-near-home blocks certain emptiness. Alpha 7 also excludes manually forced
-AWAY and contradictory/unavailable sources from the internal verdict.
-Only a diagnostic household sensor is exposed; **no production all-away binary
-sensor or production presence output** exists.
+changing FSM decisions. The internal `all_away()` returns a strict boolean:
+TRUE iff all member states are AWAY, regardless of manual/restored origin.
+A diagnostic shadow binary sensor exposes that result, but **no production
+all-away binary sensor or production presence output** exists.
 
 ## Safety boundary
 
