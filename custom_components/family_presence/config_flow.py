@@ -40,6 +40,7 @@ HOUSEHOLD_SCHEMA = vol.Schema({
     vol.Optional(CONF_DOOR): entity("binary_sensor"),
     vol.Optional(CONF_LOCK): entity("lock"),
     vol.Optional(CONF_ALARM): entity("alarm_control_panel"),
+    vol.Optional(CONF_LEGACY_AGGREGATE): entity("binary_sensor"),
 })
 PERSON_SCHEMA = vol.Schema({
     vol.Required(CONF_PERSON_NAME): str,
@@ -151,7 +152,7 @@ class FamilyPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Update shared physical sensor mappings, without touching people."""
         entry = self._get_reconfigure_entry()
         shared_fields = (CONF_HOUSEHOLD_NAME, CONF_GATE_ENTITIES, CONF_DOOR,
-                         CONF_LOCK, CONF_ALARM)
+                         CONF_LOCK, CONF_ALARM, CONF_LEGACY_AGGREGATE)
         if user_input is not None:
             title = user_input[CONF_HOUSEHOLD_NAME].strip()
             if title:
