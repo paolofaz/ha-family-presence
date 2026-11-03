@@ -247,6 +247,15 @@ class SourceAdapterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.engine.state("child"), State.AWAY)
         self.assertIn("child", notifications)
 
+    async def test_bag_recovery_is_diagnostic_but_not_a_physical_arrival(self):
+        self.inputs["bag"] = "on"
+        self.adapter._changed(ha_event("bag", "unknown", "on", self.now))
+        await self.drain()
+        self.assertEqual(self.engine.state("child"), State.AWAY)
+        rt = self.engine.runtime["child"]
+        self.assertEqual(rt.last_ignored_event, Event.RECONCILE)
+        self.assertIn("Ripristino sensore zaino", rt.last_ignored_reason)
+
     async def test_invalid_or_attribute_only_changes_do_not_change_fsm(self):
         self.inputs["watch"] = "unavailable"
         self.adapter._changed(ha_event("watch", "on", "unavailable", self.now))
