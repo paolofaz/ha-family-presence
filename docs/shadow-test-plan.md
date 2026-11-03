@@ -1,4 +1,4 @@
-# Alpha 5 — field test: scheduled bag transitions and manual events
+# Alpha 6 — field test: persistence, bag schedule and event diagnostics
 
 **Leave the old family YAML package and all alarm/lock/heating automations
 enabled.** Only use diagnostic shadow entities and buttons. Do not use these
@@ -24,7 +24,13 @@ for production automation triggers.
    changes. Check that no YAML or alarm state changes because of the button.
 10. Reboot after a manual action: shadow state and reason should return from
     Family Presence's own snapshot, marked `restored_from_storage`.
-11. Observe `near_home` and shared condominium gate interactions. These
+11. In the new sensor attributes verify `comparison_status`, `divergence_since`,
+    `last_ignored_event` and `last_ignored_reason`. An outside-window bag OFF
+    should be logged as ignored, without changing presence.
+12. After upgrading from Alpha 5, verify state restore, change only a bag's
+    configured schedule, then reload: HOME/AWAY should survive both operations.
+    A deliberate source-entity remap may require re-establishing shadow state.
+13. Observe `near_home` and shared condominium gate interactions. These
     require careful review before activating all-away in production.
 
 A manual force-away will matter for a future live all-away sensor, so perform
