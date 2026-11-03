@@ -1,3 +1,9 @@
+> **Historical Alpha 7 design, superseded by Alpha 8.** The Alpha 7
+> idea that manual AWAY must not count toward the aggregate was explicitly
+> replaced. See [Alpha 8 aggregate](alpha8-aggregate.md): manual AWAY is
+> authoritative and the home-empty binary result is ON iff everyone is AWAY.
+> No production alarm automations were changed.
+
 # Alpha 7 — household confidence safety gates (0.1.0a7)
 
 **Shadow diagnostic build; not a production home-empty detector.**
