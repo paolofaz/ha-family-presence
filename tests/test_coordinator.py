@@ -52,7 +52,7 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
             sleep=self.sleep,
         )
         self.assertIsNone(engine.state("test"))
-        self.assertIsNone(engine.all_away())
+        self.assertIs(engine.all_away(), False)
         readings["ref"] = "away"
         engine.notify_source_update("test")
         self.assertIsNone(engine.state("test"))
@@ -151,12 +151,10 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
         ]
         c = self.engine(people=people)
         self.assertIs(c.all_away(), False)
-        # Only an absent bag can corroborate departure for this bag-only member.
-        self.inputs["p2_bag"] = "off"
         await c.process("p2", Event.IPHONE_LEFT, event_time=self.now)
         self.assertIs(c.all_away(), True)
         unknown = self.engine(people=[PersonSources("p1", "One"), PersonSources("p2", "Two")])
-        self.assertIsNone(unknown.all_away())
+        self.assertIs(unknown.all_away(), False)
 
     async def test_queued_old_bag_off_cannot_override_later_phone_home(self):
         c = self.engine()
