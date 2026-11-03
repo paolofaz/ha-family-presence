@@ -86,6 +86,7 @@ class PersonRuntime:
     last_ignored_reason: str | None = None
     last_ignored_at: datetime | None = None
     ignored_count: int = 0
+    recent_events: list[dict[str, str | None]] = field(default_factory=list)
     comparison_status: str = "unknown"
     divergence_since: datetime | None = None
     decisions: list[ShadowDecision] = field(default_factory=list)
@@ -186,6 +187,20 @@ class ShadowCoordinator:
             rt.divergence_since = None
         rt.comparison_status = status
 
+    @staticmethod
+    def _append_event(rt: PersonRuntime, event: Event, at: datetime,
+                      outcome: str, reason: str) -> None:
+        """Keep a small, scrubbed audit trail suitable for HA attributes."""
+        rt.recent_events.append({
+            "at": _aware_utc(at).isoformat(),
+            "event": event.value,
+            "outcome": outcome,
+            "state": rt.state.value if rt.state is not None else None,
+            "reason": reason,
+        })
+        if len(rt.recent_events) > 12:
+            del rt.recent_events[:-12]
+
     def _record_ignored(self, person: str, event: Event, at: datetime, reason: str) -> None:
         """Record an intentionally ignored event without modifying presence."""
         rt = self.runtime[person]
@@ -193,6 +208,7 @@ class ShadowCoordinator:
         rt.last_ignored_reason = reason
         rt.last_ignored_at = _aware_utc(at)
         rt.ignored_count += 1
+        self._append_event(rt, event, at, "ignored", reason)
         if self.report_ignore:
             cfg = self.people[person]
             self.report_ignore(ShadowIgnored(
@@ -267,6 +283,7 @@ class ShadowCoordinator:
                         "at": rt.last_ignored_at.isoformat() if rt.last_ignored_at else None,
                         "count": rt.ignored_count,
                     },
+                    "recent_events": list(rt.recent_events[-12:]),
                 }
                 for key, rt in self.runtime.items()
             },
@@ -351,6 +368,26 @@ class ShadowCoordinator:
                 count = ignored.get("count")
                 if isinstance(count, int) and not isinstance(count, bool) and count >= 0:
                     rt.ignored_count = count
+            if data["format"] == 5 and isinstance(record.get("recent_events"), list):
+                # Ignore malformed history entries; never trust them for decisions.
+                for item in record["recent_events"][-12:]:
+                    if not isinstance(item, dict):
+                        continue
+                    event_name, outcome = item.get("event"), item.get("outcome")
+                    at_value, reason = item.get("at"), item.get("reason")
+                    if (event_name in Event._value2member_map_
+                            and outcome in ("ignored", "applied")
+                            and isinstance(at_value, str)
+                            and isinstance(reason, str) and len(reason) <= 256):
+                        rt.recent_events.append({
+                            "at": at_value,
+                            "event": event_name,
+                            "outcome": outcome,
+                            "state": record.get("state") if outcome == "applied" else (
+                                item.get("state") if item.get("state") in ("home", "away", "near_home", None) else None
+                            ),
+                            "reason": reason,
+                        })
             self._refresh_comparison(key)
             restored += 1
         return restored
@@ -522,6 +559,7 @@ class ShadowCoordinator:
                     rt.near_home_entered_at = None
                 if result.state == State.NEAR_HOME:
                     rt.near_home_entered_at = when
+            self._append_event(rt, event, at, "applied", result.reason)
             decision = ShadowDecision(
                 person=person,
                 event=event,
