@@ -35,7 +35,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     store = Store(hass, 1, f"family_presence_shadow.{entry.entry_id}")
     engine = build_coordinator(hass, entry)
-    engine.restore_snapshot(await store.async_load())
+    saved = await store.async_load()
+    restored = engine.restore_snapshot(saved)
+    # Convert legacy snapshots immediately, before any Configure/reload can
+    # change the backpack schedule and invalidate its old combined fingerprint.
+    if restored and isinstance(saved, dict) and saved.get("format") != 5:
+        await store.async_save(engine.snapshot())
     await engine.reconcile()
 
     unsubscribe_save = engine.async_add_listener(
