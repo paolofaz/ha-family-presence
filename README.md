@@ -5,7 +5,7 @@ Sources: phone tracker, Watch BLE, optional bag BLE sensor and shared
 gate/door/lock/alarm evidence. The original private family YAML is **not**
 included in this repository.
 
-> **Experimental Alpha 5 (0.1.0a5), shadow-only.** Do not disable the existing
+> **Experimental Alpha 6 (0.1.0a6), shadow-only.** Do not disable the existing
 > YAML presence, alarm, heating or notification automations. Diagnostic states
 > and manual buttons here do not write the original YAML helpers or operate
 > alarms, heating or locks.
@@ -23,7 +23,7 @@ included in this repository.
   BLE providers (currently 180s configured upstream); this integration adds no
   mandatory extra BLE timeout.
 
-### New event-based backpack schedule (Alpha 5)
+### Event-based backpack schedule (introduced in Alpha 5)
 
 There are **no user-facing legacy/always bag policies**. Instead, each member
 with a bag can configure **enabled**, **start time**, **end time**, and
@@ -43,6 +43,26 @@ with a bag can configure **enabled**, **start time**, **end time**, and
   defaults*, not retained precedence modes. New members default to the school
   schedule and can change it.
 
+### Alpha 6: robust restore and event diagnostics
+
+- Stored states use **snapshot format 5**, fingerprinting only the person's
+  input source mappings (iPhone/Watch/bag). Changing only backpack departure
+  hours, days or enabled flag no longer discards an established shadow state.
+- On upgrading from Alpha 5, an unchanged configuration is migrated immediately
+  from format 4 to format 5. If a source is remapped, the old state is rejected.
+  Format 4 cannot safely restore after an arbitrary schedule edit performed
+  before that first successful Alpha 6 startup.
+- Every ignored event is recorded with an Italian reason, timestamp and count;
+  examples: bag departure outside schedule, disabled bag, stale queued callback
+  or Watch exit without corroboration. Recovery from unknown/unavailable bag
+  is diagnostic only, never a fabricated arrival.
+- `recent_events` contains up to twelve accepted/ignored decisions per person,
+  including event, outcome, timestamp, state and reason. It is persisted and
+  used only for diagnostics.
+- `comparison_status` is `aligned`, `diverged`, `unknown` or
+  `not_configured`; `divergence_since` records the current continuous
+  mismatch, with no alerts or alarm actions.
+
 ### Manual state forcing: one-off, not a hold
 
 For **each person**, two **diagnostic buttons** appear:
@@ -59,7 +79,7 @@ independent shadow state. These buttons do **not** control the alarm or YAML.
 ## Setup and diagnostics
 
 1. Leave the original YAML package and all related automations running.
-2. Install the Alpha 5 prerelease from the development branch when tagged and
+2. Install the Alpha 6 prerelease from the development branch when tagged and
    available through HACS; restart Home Assistant.
 3. Add **Family Presence** under Settings → Devices & Services, and map your
    phone, Watch, optional bag, gate, door, lock and armed-away alarm entities.
@@ -70,7 +90,9 @@ independent shadow state. These buttons do **not** control the alarm or YAML.
    add/remove people or rename them while keeping stable IDs.
 6. Inspect `sensor.family_presence_shadow_...` for `reason`,
    `state_origin`, `reason_origin`, `last_transition`, `legacy_state`,
-   `matches_legacy`, backpack schedule fields and `manual_last_action`.
+   `matches_legacy`, `comparison_status`, `divergence_since`,
+   `last_ignored_event`, `last_ignored_reason`, `last_ignored_at`,
+   `ignored_event_count`, `recent_events`, backpack schedule fields and `manual_last_action`.
    **Never use shadow entities to control the alarm.**
 
 For more detail, enable INFO logs under
@@ -90,7 +112,7 @@ output. A manual **Forza fuori casa** may eventually contribute to arming when
 real outputs exist; that workflow requires separate approval and testing.
 
 See [Architecture](docs/architecture.md), [Backpack transitions](docs/bag-policy.md),
-[Alpha 5 field test](docs/alpha5-event-controls.md),
+[Alpha 6 field test](docs/alpha5-event-controls.md),
 [Shadow test plan](docs/shadow-test-plan.md) and
 [GitHub PR #1](https://github.com/paolofaz/ha-family-presence/pull/1).
 

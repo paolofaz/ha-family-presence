@@ -73,6 +73,19 @@ class ShadowPersonSensor(SensorEntity):
                 if rt.state is not None and legacy in ("home", "away", "near_home")
                 else None
             ),
+            "comparison_status": self.engine._comparison_status(self.person),
+            "divergence_since": (
+                rt.divergence_since.isoformat() if rt.divergence_since else None
+            ),
+            "last_ignored_event": (
+                rt.last_ignored_event.value if rt.last_ignored_event else None
+            ),
+            "last_ignored_reason": rt.last_ignored_reason,
+            "last_ignored_at": (
+                rt.last_ignored_at.isoformat() if rt.last_ignored_at else None
+            ),
+            "ignored_event_count": rt.ignored_count,
+            "recent_events": list(rt.recent_events[-12:]),
             "last_blocked_event": rt.last_blocked_event.value if rt.last_blocked_event else None,
             "last_blocked_at": rt.last_blocked_at.isoformat() if rt.last_blocked_at else None,
         }

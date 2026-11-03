@@ -55,6 +55,15 @@ class ShadowBlocked:
     reference: State | None
 
 
+@dataclass(frozen=True, slots=True)
+class ShadowIgnored:
+    person: str
+    event: Event
+    reason: str
+    when: datetime
+    reference: State | None
+
+
 @dataclass(slots=True)
 class PersonRuntime:
     state: State | None = None
@@ -73,6 +82,13 @@ class PersonRuntime:
     last_source_event_at: datetime | None = None
     last_blocked_event: Event | None = None
     last_blocked_at: datetime | None = None
+    last_ignored_event: Event | None = None
+    last_ignored_reason: str | None = None
+    last_ignored_at: datetime | None = None
+    ignored_count: int = 0
+    recent_events: list[dict[str, str | None]] = field(default_factory=list)
+    comparison_status: str = "unknown"
+    divergence_since: datetime | None = None
     decisions: list[ShadowDecision] = field(default_factory=list)
     source_revision: int = 0
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
@@ -116,6 +132,7 @@ class ShadowCoordinator:
         local_timezone: tzinfo = timezone.utc,
         report: Callable[[ShadowDecision], None] | None = None,
         report_block: Callable[[ShadowBlocked], None] | None = None,
+        report_ignore: Callable[[ShadowIgnored], None] | None = None,
     ) -> None:
         self.people = {p.key: p for p in people}
         if len(self.people) != len(people):
@@ -134,6 +151,7 @@ class ShadowCoordinator:
         self.local_timezone = local_timezone
         self.report = report
         self.report_block = report_block
+        self.report_ignore = report_ignore
         self._listeners: set[Callable[[str], None]] = set()
 
     def async_add_listener(self, listener: Callable[[str], None]) -> Callable[[], None]:
@@ -146,8 +164,74 @@ class ShadowCoordinator:
             listener(person)
 
     def notify_source_update(self, person: str) -> None:
-        """Refresh shadow diagnostics for raw source and legacy helper changes."""
+        """Refresh comparison after a legacy/source entity has changed."""
+        self._refresh_comparison(person)
         self._notify(person)
+
+    def _comparison_status(self, person: str) -> str:
+        cfg = self.people[person]
+        if not cfg.reference:
+            return "not_configured"
+        baseline = parse_state(self._read(cfg.reference))
+        state = self.runtime[person].state
+        if baseline is None or state is None:
+            return "unknown"
+        return "aligned" if baseline == state else "diverged"
+
+    def _refresh_comparison(self, person: str) -> None:
+        rt = self.runtime[person]
+        status = self._comparison_status(person)
+        if status == "diverged" and rt.comparison_status != "diverged":
+            rt.divergence_since = _aware_utc(self._clock())
+        elif status != "diverged":
+            rt.divergence_since = None
+        rt.comparison_status = status
+
+    @staticmethod
+    def _append_event(rt: PersonRuntime, event: Event, at: datetime,
+                      outcome: str, reason: str) -> None:
+        """Keep a small, scrubbed audit trail suitable for HA attributes."""
+        rt.recent_events.append({
+            "at": _aware_utc(at).isoformat(),
+            "event": event.value,
+            "outcome": outcome,
+            "state": rt.state.value if rt.state is not None else None,
+            "reason": reason,
+        })
+        if len(rt.recent_events) > 12:
+            del rt.recent_events[:-12]
+
+    def _record_ignored(self, person: str, event: Event, at: datetime, reason: str) -> None:
+        """Record an intentionally ignored event without modifying presence."""
+        rt = self.runtime[person]
+        rt.last_ignored_event = event
+        rt.last_ignored_reason = reason
+        rt.last_ignored_at = _aware_utc(at)
+        rt.ignored_count += 1
+        self._append_event(rt, event, at, "ignored", reason)
+        if self.report_ignore:
+            cfg = self.people[person]
+            self.report_ignore(ShadowIgnored(
+                person, event, reason, rt.last_ignored_at,
+                parse_state(self._read(cfg.reference)) if cfg.reference else None,
+            ))
+        self._notify(person)
+
+    def note_ignored(self, person: str, event: Event, *, at: datetime, reason: str) -> None:
+        """Record a rejected source transition (including invalid recovery)."""
+        self._record_ignored(person, event, at, reason)
+
+    @staticmethod
+    def _source_fingerprint(person: PersonSources) -> str:
+        """Stable across schedule edits; changes if a physical source is remapped."""
+        mapping = {
+            "iphone": person.iphone,
+            "watch": person.watch,
+            "bag": person.bag,
+        }
+        return hashlib.sha256(
+            json.dumps(mapping, sort_keys=True).encode("utf-8")
+        ).hexdigest()
 
     @staticmethod
     def _fingerprint(
@@ -177,10 +261,10 @@ class ShadowCoordinator:
     def snapshot(self) -> dict[str, Any]:
         """Serialize only shadow-owned state and diagnostic explanation."""
         return {
-            "format": 4,
+            "format": 5,
             "people": {
                 key: {
-                    "fingerprint": self._fingerprint(self.people[key]),
+                    "fingerprint": self._source_fingerprint(self.people[key]),
                     "state": rt.state.value if rt.state is not None else None,
                     "reason": rt.last_reason,
                     "last_changed": (
@@ -193,6 +277,13 @@ class ShadowCoordinator:
                             if rt.manual_last_action_at else None
                         ),
                     },
+                    "ignored": {
+                        "event": rt.last_ignored_event.value if rt.last_ignored_event else None,
+                        "reason": rt.last_ignored_reason,
+                        "at": rt.last_ignored_at.isoformat() if rt.last_ignored_at else None,
+                        "count": rt.ignored_count,
+                    },
+                    "recent_events": list(rt.recent_events[-12:]),
                 }
                 for key, rt in self.runtime.items()
             },
@@ -206,7 +297,7 @@ class ShadowCoordinator:
         itself establish all-away. Do not restore physical event timestamps or
         infer a near_home age. Version 1 snapshots are supported for upgrade.
         """
-        if not isinstance(data, dict) or data.get("format") not in (1, 2, 3, 4):
+        if not isinstance(data, dict) or data.get("format") not in (1, 2, 3, 4, 5):
             return 0
         people = data.get("people")
         if not isinstance(people, dict):
@@ -217,9 +308,14 @@ class ShadowCoordinator:
             record = people.get(key)
             if not isinstance(record, dict):
                 continue
-            if record.get("fingerprint") != self._fingerprint(
-                self.people[key], legacy=legacy, old_format=data["format"] in (2, 3)
-            ):
+            expected = (
+                self._source_fingerprint(self.people[key])
+                if data["format"] == 5 else
+                self._fingerprint(
+                    self.people[key], legacy=legacy, old_format=data["format"] in (2, 3)
+                )
+            )
+            if record.get("fingerprint") != expected:
                 continue
             saved_state = parse_state(record.get("state"))
             if saved_state is None:
@@ -245,7 +341,7 @@ class ShadowCoordinator:
                     pass
             rt.near_home_entered_at = None
 
-            manual = record.get("manual") if data["format"] == 4 else None
+            manual = record.get("manual") if data["format"] in (4, 5) else None
             if isinstance(manual, dict):
                 action = manual.get("last_action")
                 rt.manual_last_action = action if isinstance(action, str) else None
@@ -257,6 +353,43 @@ class ShadowCoordinator:
                         )
                     except ValueError:
                         pass
+            if data["format"] == 5 and isinstance(record.get("ignored"), dict):
+                ignored = record["ignored"]
+                try:
+                    rt.last_ignored_event = Event(ignored.get("event"))
+                except (TypeError, ValueError):
+                    pass
+                reason = ignored.get("reason")
+                rt.last_ignored_reason = reason if isinstance(reason, str) else None
+                try:
+                    rt.last_ignored_at = _aware_utc(datetime.fromisoformat(ignored["at"]))
+                except (KeyError, ValueError, TypeError):
+                    pass
+                count = ignored.get("count")
+                if isinstance(count, int) and not isinstance(count, bool) and count >= 0:
+                    rt.ignored_count = count
+            if data["format"] == 5 and isinstance(record.get("recent_events"), list):
+                # Ignore malformed history entries; never trust them for decisions.
+                for item in record["recent_events"][-12:]:
+                    if not isinstance(item, dict):
+                        continue
+                    event_name, outcome = item.get("event"), item.get("outcome")
+                    at_value, reason = item.get("at"), item.get("reason")
+                    state_value = item.get("state")
+                    if (isinstance(event_name, str)
+                            and event_name in Event._value2member_map_
+                            and outcome in ("ignored", "applied")
+                            and isinstance(at_value, str)
+                            and isinstance(reason, str) and len(reason) <= 256
+                            and state_value in ("home", "away", "near_home", None)):
+                        rt.recent_events.append({
+                            "at": at_value,
+                            "event": event_name,
+                            "outcome": outcome,
+                            "state": state_value,
+                            "reason": reason,
+                        })
+            self._refresh_comparison(key)
             restored += 1
         return restored
 
@@ -333,8 +466,8 @@ class ShadowCoordinator:
                 and event not in (Event.RECONCILE, Event.MANUAL_HOME, Event.MANUAL_AWAY)
                 and at < rt.last_source_event_at
             ):
-                # Older queued sensor callbacks must not override a newer
-                # processed phone/Watch/bag event.
+                # Older queued callbacks cannot override a newer event.
+                self._record_ignored(person, event, at, "Evento accodato precedente a uno già elaborato")
                 return None
             if (
                 rt.manual_last_action_at is not None
@@ -343,6 +476,7 @@ class ShadowCoordinator:
             ):
                 # A delayed event from before a manual button press must not
                 # undo the forced state; only events fired AFTER may do so.
+                self._record_ignored(person, event, at, "Evento precedente alla correzione manuale")
                 return None
 
             if event == Event.WATCH_SEEN:
@@ -351,6 +485,7 @@ class ShadowCoordinator:
                 if (revision is not None and revision != rt.source_revision) or (
                     not config.watch or self._read(config.watch) != "on"
                 ):
+                    self._record_ignored(person, event, at, "Rilevamento Watch superato o non più valido")
                     return None
 
             # OFF physical correlation must use last_seen_before_off, not the
@@ -376,17 +511,35 @@ class ShadowCoordinator:
             # Bag transitions are real events, never a permanent OFF veto.
             # If its state has since changed, drop the delayed stale callback.
             if event == Event.BAG_LEFT and evidence.bag_status != BagStatus.ABSENT:
+                self._record_ignored(person, event, at, "Zaino non più assente: evento obsoleto")
                 return None
             if event == Event.BAG_ARRIVED and evidence.bag_status != BagStatus.PRESENT:
+                self._record_ignored(person, event, at, "Zaino non più presente: evento obsoleto")
                 return None
 
             if event not in (Event.RECONCILE, Event.MANUAL_HOME, Event.MANUAL_AWAY):
                 rt.last_source_event_at = at
             result: Decision | None = decide(rt.state, event, evidence)
             if result is None:
+                if event == Event.RECONCILE:
+                    return None  # Boot/recovery must never fabricate a transition.
+                if event in (Event.BAG_LEFT, Event.BAG_ARRIVED) and not evidence.bag_enabled:
+                    reason = "Zaino disabilitato nella configurazione"
+                elif event == Event.BAG_LEFT and not evidence.bag_departure_active:
+                    reason = "Uscita zaino fuori dalla fascia oraria configurata"
+                elif event == Event.WATCH_LOST:
+                    reason = "Watch non rilevato, ma mancano condizioni di uscita valide"
+                elif event == Event.WATCH_SEEN:
+                    reason = "Watch rilevato, ma lo stato attuale non richiede un rientro"
+                elif event == Event.PHYSICAL_ENTRY:
+                    reason = "Evento fisico senza Watch e stato vicino casa compatibili"
+                else:
+                    reason = "Nessun cambio di presenza richiesto dallo stato attuale"
+                self._record_ignored(person, event, at, reason)
                 return None
             previous = rt.state
             rt.state = result.state
+            self._refresh_comparison(person)
             rt.last_reason = result.reason
             rt.restored_from_storage = False
             manual = event in (Event.MANUAL_HOME, Event.MANUAL_AWAY)
@@ -407,6 +560,7 @@ class ShadowCoordinator:
                     rt.near_home_entered_at = None
                 if result.state == State.NEAR_HOME:
                     rt.near_home_entered_at = when
+            self._append_event(rt, event, at, "applied", result.reason)
             decision = ShadowDecision(
                 person=person,
                 event=event,

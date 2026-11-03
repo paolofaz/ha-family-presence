@@ -44,13 +44,17 @@ remain owned by their dedicated HA BLE integrations.
 
 ## Restart and confidence
 
-Snapshot **format 4** includes a fingerprint of source mappings and bag
-schedule plus FSM-owned state, reason, transition time and last manual action.
-Old snapshot formats 1–3 can be read using a legacy fingerprint, when mapping
-still matches. Old persistent manual bag holds are **not restored as holds**.
+Snapshot **format 5** fingerprints source mappings (iPhone/Watch/bag) alone.
+Departure schedule edits no longer erase the saved shadow state. It also stores
+state, reason, transition time, last manual action and last ignored event.
+Old formats 1–4 can be read when their original fingerprints still match.
+Alpha 5 format-4 snapshots are converted immediately on successful first load;
+an arbitrary schedule edit before that conversion cannot be validated safely. Old persistent manual bag holds are **not restored as holds**.
 No previous physical gate/door events are restored.
 
-Restored states are marked `restored_from_storage`. The conservative internal
+Restored states are marked `restored_from_storage`. A per-person diagnostic
+records ignored input events and tracks YAML/shadow mismatches without
+changing FSM decisions. The conservative internal
 `all_away()` does not return true based solely on saved away states, and
 near-home blocks certain emptiness. No actual all-away binary sensor or
 production presence output has been exposed yet.
