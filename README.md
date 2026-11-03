@@ -56,6 +56,9 @@ with a bag can configure **enabled**, **start time**, **end time**, and
   examples: bag departure outside schedule, disabled bag, stale queued callback
   or Watch exit without corroboration. Recovery from unknown/unavailable bag
   is diagnostic only, never a fabricated arrival.
+- `recent_events` contains up to twelve accepted/ignored decisions per person,
+  including event, outcome, timestamp, state and reason. It is persisted and
+  used only for diagnostics.
 - `comparison_status` is `aligned`, `diverged`, `unknown` or
   `not_configured`; `divergence_since` records the current continuous
   mismatch, with no alerts or alarm actions.
@@ -89,7 +92,7 @@ independent shadow state. These buttons do **not** control the alarm or YAML.
    `state_origin`, `reason_origin`, `last_transition`, `legacy_state`,
    `matches_legacy`, `comparison_status`, `divergence_since`,
    `last_ignored_event`, `last_ignored_reason`, `last_ignored_at`,
-   `ignored_event_count`, backpack schedule fields and `manual_last_action`.
+   `ignored_event_count`, `recent_events`, backpack schedule fields and `manual_last_action`.
    **Never use shadow entities to control the alarm.**
 
 For more detail, enable INFO logs under
