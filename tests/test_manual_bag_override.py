@@ -88,7 +88,7 @@ class ManualForceTests(unittest.IsolatedAsyncioTestCase):
         c = self.engine
         await c.force_state("person", State.HOME)
         snapshot = c.snapshot()
-        self.assertEqual(snapshot["format"], 4)
+        self.assertEqual(snapshot["format"], 5)
         self.assertEqual(snapshot["people"]["person"]["manual"]["last_action"], "manual_home")
         new = ShadowCoordinator(
             list(c.people.values()), read_state=self.sources.get,
