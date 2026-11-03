@@ -126,6 +126,23 @@ class ShadowSensorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(attrs["reason"], "Forzato in casa manualmente")
         self.assertEqual(attrs["state_origin"], "manual_force")
 
+    async def test_divergence_fields_and_ignored_event_are_exposed(self):
+        engine = self.new()
+        await engine.process("person", Event.IPHONE_LEFT, event_time=self.now)
+        sensor = self.cls("entry", engine, "person")
+        self.assertEqual(sensor.extra_state_attributes["comparison_status"], "diverged")
+        self.assertIsNotNone(sensor.extra_state_attributes["divergence_since"])
+        await engine.process("person", Event.WATCH_LOST, event_time=self.now)
+        attrs = sensor.extra_state_attributes
+        self.assertEqual(attrs["last_ignored_event"], "watch_off")
+        self.assertIn("mancano condizioni", attrs["last_ignored_reason"])
+        self.assertEqual(attrs["ignored_event_count"], 1)
+        self.s["legacy"] = "away"
+        engine.notify_source_update("person")
+        attrs = sensor.extra_state_attributes
+        self.assertEqual(attrs["comparison_status"], "aligned")
+        self.assertIsNone(attrs["divergence_since"])
+
     async def test_diagnostic_reports_missing_reason_instead_of_inventing_it(self):
         coordinator = self.new()
         sensor = self.cls("entry", coordinator, "person")
