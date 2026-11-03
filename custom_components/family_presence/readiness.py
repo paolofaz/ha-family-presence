@@ -1,8 +1,8 @@
-"""Read-only, conservative household assessment for the shadow FSM.
+"""Aggregate the independent FSM member states without second-guessing them.
 
-This is *not* a production vacancy detector. It never reads the legacy YAML
-for decisions and never makes actuator calls. Candidate empty does not mean
-that the current sensors have been field-validated for alarm use.
+The manual force event is authoritative until a later valid FSM event changes
+the member state. Raw sensors can raise *diagnostic warnings*, but they cannot
+veto the aggregate. This module reads no legacy YAML states for decisions.
 """
 from __future__ import annotations
 
@@ -17,81 +17,87 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class HouseholdAssessment:
-    """Explanatory result for a diagnostic sensor, never a control command."""
+    """State-only home-empty verdict and independent source diagnostics."""
 
+    all_away: bool
     status: str
     reasons: dict[str, str]
     indicated_present: tuple[str, ...]
     unresolved: tuple[str, ...]
     divergent: tuple[str, ...]
+    source_warnings: dict[str, tuple[str, ...]]
 
 
 def assess_household(engine: ShadowCoordinator) -> HouseholdAssessment:
-    """Classify a household without trusting manual AWAY or restored state.
+    """True iff the nonempty household has AWAY for every member.
 
-    Live contradictory phone/Watch readings block the all-away candidate.
-    A bag being present is not itself proof that the person is home, but when
-    no phone indicates outside, its presence cannot confirm emptiness.
+    Restored AWAY and manually forced AWAY are valid *states* for aggregation.
+    Unknown and NEAR_HOME are not AWAY. This matches the legacy YAML template.
     """
     reasons: dict[str, str] = {}
-    indicated_present: list[str] = []
+    present: list[str] = []
     unresolved: list[str] = []
     divergent: list[str] = []
+    source_warnings: dict[str, tuple[str, ...]] = {}
 
-    for key, p in engine.people.items():
+    for key, person in engine.people.items():
         rt = engine.runtime[key]
+        state = rt.state
+        if state is State.AWAY:
+            reason = (
+                "away_forzato" if rt.state_origin == "manual_force"
+                else "away_ripristinato" if rt.restored_from_storage
+                else "away_fsm"
+            )
+        elif state is State.HOME:
+            reason = "home_forzato" if rt.state_origin == "manual_force" else "home_fsm"
+            present.append(key)
+        elif state is State.NEAR_HOME:
+            reason = "near_home"
+            present.append(key)
+        else:
+            reason = "stato_sconosciuto"
+            unresolved.append(key)
+        reasons[key] = reason
+
         if engine._comparison_status(key) == "diverged":
             divergent.append(key)
 
-        if rt.state is None:
-            reason = "stato_sconosciuto"
-        elif rt.restored_from_storage:
-            reason = "stato_ripristinato_non_verificato"
-        elif rt.state in (State.HOME, State.NEAR_HOME):
-            reason = (
-                "home_manuale_indicato" if rt.state_origin == "manual_force"
-                else "presenza_rilevata"
-            )
-            indicated_present.append(key)
-        elif rt.state_origin == "manual_force":
-            # Pressing "force away" does not establish physical departure.
-            reason = "away_manuale_non_verificato"
-        else:
-            iphone = engine._read(p.iphone) if p.iphone else None
-            watch = engine._read(p.watch) if p.watch else None
-            bag = engine._read(p.bag) if p.bag and p.bag_schedule.enabled else None
-            phone_healthy = iphone is not None and iphone not in ("unknown", "unavailable")
-            phone_outside = phone_healthy and iphone != "home"
-            watch_healthy = watch in ("on", "off")
-            bag_healthy = bag in ("on", "off")
+        # Advisory only; these readings NEVER alter the authoritative verdict.
+        warnings: list[str] = []
+        if person.iphone:
+            iphone = engine._read(person.iphone)
+            if state is State.AWAY and iphone == "home":
+                warnings.append("iphone_home_con_fsm_away")
+            elif iphone in (None, "unknown", "unavailable"):
+                warnings.append("iphone_non_disponibile")
+        if person.watch:
+            watch = engine._read(person.watch)
+            if state is State.AWAY and watch == "on":
+                warnings.append("watch_on_con_fsm_away")
+            elif watch in (None, "unknown", "unavailable"):
+                warnings.append("watch_non_disponibile")
+        if person.bag and person.bag_schedule.enabled:
+            bag = engine._read(person.bag)
+            if bag in (None, "unknown", "unavailable"):
+                warnings.append("zaino_non_disponibile")
+        if warnings:
+            source_warnings[key] = tuple(warnings)
 
-            if iphone == "home":
-                reason = "iphone_segnala_casa"
-            elif watch == "on":
-                reason = "watch_rilevato_vicino_casa"
-            elif bag == "on" and not phone_outside:
-                reason = "zaino_presente_senza_conferma_uscita"
-            elif not (phone_healthy or watch_healthy or bag_healthy):
-                reason = "fonti_non_disponibili"
-            else:
-                reason = "away_osservato_candidato"
-
-        reasons[key] = reason
-        if reason not in (
-            "presenza_rilevata", "home_manuale_indicato", "away_osservato_candidato",
-        ):
-            unresolved.append(key)
-
-    if indicated_present:
-        status = "presence_indicated"
-    elif engine.people and not unresolved:
-        status = "candidate_empty"
-    else:
-        status = "indeterminate"
+    all_away = bool(engine.people) and all(
+        rt.state is State.AWAY for rt in engine.runtime.values()
+    )
+    status = (
+        "all_away" if all_away
+        else "presence_indicated" if present
+        else "incomplete"
+    )
     return HouseholdAssessment(
+        all_away=all_away,
         status=status,
         reasons=reasons,
-        indicated_present=tuple(indicated_present),
+        indicated_present=tuple(present),
         unresolved=tuple(unresolved),
         divergent=tuple(divergent),
+        source_warnings=source_warnings,
     )
