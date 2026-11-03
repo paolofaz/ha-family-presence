@@ -101,7 +101,7 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(upgraded.restore_snapshot(saved), 1)
         self.assertEqual(upgraded.state("child"), State.AWAY)
         self.assertEqual(upgraded.runtime["child"].last_reason, "iPhone left home zone")
-        self.assertEqual(upgraded.snapshot()["format"], 2)
+        self.assertEqual(upgraded.snapshot()["format"], 3)
 
     async def test_changed_source_or_priority_rejects_stale_snapshot(self):
         first = await self.outside()
