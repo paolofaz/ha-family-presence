@@ -41,6 +41,11 @@ New members receive stable IDs independent of their names. For early name-based 
 - A school-hours bag veto: would allow false Watch arrivals after the cutoff; add only with evidence.
 - Further bag-OFF debounce: the dedicated provider already waits 180 seconds after last advertisement; adding a second delay could double absence latency.
 - Arbitrary conditions, priorities, scripts or template actions: opaque and difficult to test.
-- Manual overrides and production all-away outputs: still need explicit alarm-safe design and tests before activation.
+- Production-safe manual override and all-away outputs: Alpha 5 adds diagnostic-only buttons for confirmed HOME without a bag, and a conservative revocation path. Full field validation and production approval are still required.
 
 All changes remain shadow-only until Home Assistant runtime and safety scenarios have been verified.
+
+
+## Decisione finale sulle due politiche dello zaino
+
+Durante la fase shadow manteniamo **Priorità assoluta** e **Fascia scolastica** con i valori interni invariati. **Prima della release stabile** riesamineremo se lasciarle entrambe oppure semplificare a una sola, con i dati reali del test. Questa decisione aperta è annotata nella [issue #3](https://github.com/paolofaz/ha-family-presence/issues/3).

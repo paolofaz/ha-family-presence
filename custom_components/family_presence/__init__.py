@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from .sources import ShadowSourceAdapter
 
 
-PLATFORMS = ("sensor",)
+PLATFORMS = ("sensor", "button")
 
 
 @dataclass(slots=True)

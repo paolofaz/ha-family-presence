@@ -117,6 +117,21 @@ class ShadowSensorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(attrs["bag_policy"], "Priorità assoluta")
         self.assertEqual(attrs["bag_policy_code"], "always")
 
+    async def test_manual_exception_is_visible_to_lovelace(self):
+        readings = {"bag": "off"}
+        engine = ShadowCoordinator(
+            [PersonSources("kid", "Child", bag="bag")],
+            read_state=readings.get, clock=lambda: self.now,
+        )
+        self.assertTrue(await engine.confirm_home_without_bag("kid"))
+        sensor = self.cls("entry", engine, "kid")
+        attrs = sensor.extra_state_attributes
+        self.assertTrue(attrs["manual_home_active"])
+        self.assertIsNotNone(attrs["manual_home_since"])
+        self.assertFalse(attrs["manual_review_required"])
+        self.assertEqual(attrs["manual_last_action"], "home_confirmed")
+        self.assertIsNotNone(attrs["manual_review_due_at"])
+
     async def test_diagnostic_reports_missing_reason_instead_of_inventing_it(self):
         coordinator = self.new()
         sensor = self.cls("entry", coordinator, "person")

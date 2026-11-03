@@ -173,9 +173,11 @@ class ShadowSourceAdapter:
         # Recovery from unknown/unavailable is NOT a new arrival/departure.
         # But a recovered OFF bag can reconcile the strict absence invariant.
         if old in _INVALID or old is None or new in _INVALID:
-            if new == "off" and entity_id in self._person_inputs:
+            if new in ("off", "on") and entity_id in self._person_inputs:
                 for key, kind in self._person_inputs[entity_id]:
                     if kind == "bag":
+                        # OFF may reapply strict absence; ON may end a manual
+                        # exception. Neither recovery is a physical arrival.
                         revision = self.engine.note_person_event(key)
                         self._schedule(self.engine.process(
                             key, Event.RECONCILE, event_time=at, revision=revision,

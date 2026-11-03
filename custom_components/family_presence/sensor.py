@@ -57,6 +57,28 @@ class ShadowPersonSensor(SensorEntity):
                 rt.near_home_entered_at.isoformat() if rt.near_home_entered_at else None
             ),
             "restored_from_storage": rt.restored_from_storage,
+            "manual_home_active": rt.manual_home_active,
+            "manual_home_since": (
+                rt.manual_home_since.isoformat() if rt.manual_home_since else None
+            ),
+            "manual_review_due_at": (
+                rt.manual_home_review_at.isoformat()
+                if rt.manual_home_review_at else None
+            ),
+            "manual_review_required": self.engine.manual_review_due(self.person),
+            "manual_last_action": rt.manual_last_action,
+            "manual_last_action_at": (
+                rt.manual_last_action_at.isoformat()
+                if rt.manual_last_action_at else None
+            ),
+            "manual_suppressed_event": (
+                rt.manual_suppressed_event.value
+                if rt.manual_suppressed_event else None
+            ),
+            "manual_suppressed_at": (
+                rt.manual_suppressed_at.isoformat()
+                if rt.manual_suppressed_at else None
+            ),
             "bag_state": bag,
             "bag_policy": bag_policy_label(p.bag_policy) if p.bag else None,
             "bag_policy_code": p.bag_policy.value if p.bag else None,

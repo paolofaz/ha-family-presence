@@ -18,7 +18,7 @@ A Watch charging at home may turn ON during school hours. A neighbor opening a s
 
 ## Real trade-offs
 
-A child may return without their bag; strict mode can therefore say AWAY while the child really is home. False bag OFF readings can produce the same problem. **Do not connect this experimental logic to alarm automations until provider reliability, diagnostic conflicts and a safe manual override are validated.**
+A child may return without their bag; strict mode can therefore say AWAY while the child really is home. False bag OFF readings can produce the same problem. **Do not connect this experimental logic to alarm automations until provider reliability, diagnostic conflicts and the new shadow-only manual exception are validated with real sensors.**
 
 ## Test matrix
 
@@ -33,4 +33,7 @@ A child may return without their bag; strict mode can therefore say AWAY while t
 | HOME | Bag becomes UNKNOWN | UNKNOWN | no automatic arrival or departure |
 | Unknown | Reconcile with stable bag OFF | OFF | AWAY |
 
-The current coordinator evaluates the real bag state **after** any Watch ON delay and prevents a queued older Watch ON from overtaking a new bag/phone/Watch event. Live Home Assistant event-adapter integration tests and a manual-override design are still outstanding.
+The current coordinator evaluates the real bag state **after** any Watch ON delay and prevents a queued older Watch ON from overtaking a new bag/phone/Watch event. Alpha 5 adds an explicit shadow-only human-confirmed HOME exception, an eight-hour advisory review with no automatic exit, and an explicit revocation to unknown rather than away. Live end-to-end validation and production safety approval are still outstanding.
+
+
+Before stable release decide whether to keep both bag policies or simplify to one; track the decision in issue #3. Keep both unchanged during current testing.

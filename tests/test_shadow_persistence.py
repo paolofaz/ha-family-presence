@@ -52,7 +52,7 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         first = await self.outside()
         snapshot = first.snapshot()
         original_time = first.runtime["child"].last_changed
-        self.assertEqual(snapshot["format"], 2)
+        self.assertEqual(snapshot["format"], 3)
         self.values["reference"] = "home"  # YAML DISAGREES.
         restarted = self.new()
         self.assertIsNone(restarted.state("child"))
@@ -78,12 +78,12 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(next_run.state("child"), State.AWAY)
             self.assertEqual(next_run.runtime["child"].last_reason, "iPhone left home zone")
             saved = next_run.snapshot()
-        self.assertEqual(saved["format"], 2)
+        self.assertEqual(saved["format"], 3)
 
     async def test_changing_only_comparison_helper_preserves_new_format(self):
         first = await self.outside()
         saved = first.snapshot()
-        self.assertEqual(saved["format"], 2)
+        self.assertEqual(saved["format"], 3)
         other_reference = self.new(reference="another_ref")
         self.assertEqual(other_reference.restore_snapshot(saved), 1)
         self.assertEqual(other_reference.state("child"), State.AWAY)
@@ -207,7 +207,7 @@ class ShadowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         serialized = str(snapshot)
         for secret in ("last_seen", "rssi", "irk", "another_ref", "phone_value"):
             self.assertNotIn(secret, serialized)
-        self.assertEqual(snapshot["format"], 2)
+        self.assertEqual(snapshot["format"], 3)
 
 
 if __name__ == "__main__":

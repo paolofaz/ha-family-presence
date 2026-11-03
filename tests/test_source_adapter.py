@@ -183,6 +183,18 @@ class SourceAdapterTests(unittest.IsolatedAsyncioTestCase):
         await self.drain()
         self.assertEqual(self.engine.state("child"), State.AWAY)
 
+    async def test_bag_recovered_on_releases_manual_hold_without_fake_arrival(self):
+        self.inputs["bag"] = "off"
+        self.assertTrue(await self.engine.confirm_home_without_bag("child"))
+        self.assertTrue(self.engine.runtime["child"].manual_home_active)
+        self.inputs["bag"] = "on"
+        self.adapter._changed(ha_event(
+            "bag", "unavailable", "on", self.now,
+        ))
+        await self.drain()
+        self.assertFalse(self.engine.runtime["child"].manual_home_active)
+        self.assertEqual(self.engine.state("child"), State.HOME)
+
     async def test_unavailable_watch_on_does_not_create_false_arrival(self):
         self.adapter._changed(ha_event("watch", "unknown", "on", self.now))
         await self.drain()

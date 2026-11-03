@@ -29,7 +29,12 @@ Family Presence is experimental. **Do not remove the existing YAML package, rewi
 | Restart when YAML and saved shadow disagree | Keep the **shadow-owned state and reason**; expose disagreement through `matches_legacy=false` only |
 | Fresh install without a compatible shadow snapshot | Shadow state starts `unknown` until a source event or strict bag absence establishes an independent state |
 | Restart when no saved reason exists | Keep the independent saved state, but `reason` stays empty rather than being invented |
-| Change only the mapped old YAML comparison helper | New format-2 shadow snapshot remains compatible and independent |
+| Change only the mapped old YAML comparison helper | Independent shadow snapshot remains compatible (format 3 in Alpha 5) |
+| Premere Conferma in casa senza zaino, con zaino OFF | Lo shadow diventa HOME, deroga attiva, nessuna azione sull'allarme |
+| Dopo 8 ore con deroga | Solo richiesta di revisione: mai passaggio automatico a AWAY |
+| Revocare la conferma con zaino ancora OFF | Shadow unknown; vecchi eventi di cancello/Watch/zaino OFF non autorizzano AWAY |
+| Riavviare con deroga attiva o dopo revoca | La conferma e il blocco di prudenza sono persistenti |
+| Ritorno zaino a ON, anche da unavailable | La deroga termina; i normali eventi tornano a governare la FSM |
 
 Caution: the strict bag veto takes effect only after the *upstream* bag sensor actually reports `off`. A physically absent bag may remain `on` for about three minutes. Watch BLE has its own configured 15s polling / 180s timeout. A shared condominium gate event is corroboration, not identity.
 
@@ -48,5 +53,5 @@ Capture a few anonymized sequences: member's reference YAML state, shadow state,
 - Real HA setup/teardown and repeated reload test on a supported version, not only mocked adapter tests.
 - Stable persistence through HA restart and source provider delayed startup.
 - Time-aligned parity report / diagnostic history for discrepancies.
-- Manual confirmed-home exception design when a child enters without their backpack; avoid auto-returning to away upon unsafe expiry.
+- Field-validate the experimental manual confirmed-HOME controls, conservative revocation and persistence after restart; do not use their states for production actions yet.
 - Brand assets, release packaging, HACS validation.

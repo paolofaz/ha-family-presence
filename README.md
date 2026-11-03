@@ -2,7 +2,7 @@
 
 A configurable, multi-person Home Assistant presence FSM using phone zone tracking, BLE wearables, physical gate/door/lock events, and optional bag sensors.
 
-> **Experimental shadow build (0.1.0a4): DO NOT REPLACE YOUR EXISTING YAML.** The integration subscribes to HA inputs, records *shadow-only* state snapshots and exposes **diagnostic shadow sensors**, never production presence entities. It does **not** modify existing `input_select` values, or control alarm/locks/heating. It has not yet been end-to-end tested inside a running Home Assistant instance.
+> **Experimental shadow build (0.1.0a5): DO NOT REPLACE YOUR EXISTING YAML.** The integration subscribes to HA inputs, records *shadow-only* state snapshots and exposes **diagnostic shadow sensors**, never production presence entities. It does **not** modify existing `input_select` values, or control alarm/locks/heating. It has not yet been end-to-end tested inside a running Home Assistant instance.
 
 ## Core behavior
 
@@ -43,7 +43,18 @@ Under **Settings → Devices & Services → Family Presence → Configure**:
 
 Core FSM states, decision/event types, precedence between phone/Watch/physical inputs, and the two-second Watch observation delay remain in code, not user-defined expressions. The upstream Beacon BLE and Watch BLE absence timeouts are adjusted **only** in their respective integrations. Use **Reconfigure** on the integration entry (separate from Configure) to change shared entrance sensors, edit a member's mapped phone/Watch/bag/reference, add a member or remove a member. Each member keeps a stable internal ID and duplicated personal sources are rejected.
 
-**Limitations:** log lines and diagnostic sensor comparisons include instantaneous legacy-state snapshots, not a synchronized parity report. HA event-adapter and new diagnostic sensor platform need real-world integration testing. Member/source entity edits now use Reconfigure; timing windows and backpack policies use Configure. Neither operation touches the original YAML. Additional bag debounce, manual override, full production presence entities and all-away output are **not implemented**. Persisted shadow states are diagnostic-only and can be stale; a stored `away` state by itself never makes the internal all-away result true.
+**Limitations:** log lines and diagnostic sensor comparisons include instantaneous legacy-state snapshots, not a synchronized parity report. HA event-adapter and new diagnostic sensor platform need real-world integration testing. Member/source entity edits now use Reconfigure; timing windows and backpack policies use Configure. Neither operation touches the original YAML. Additional bag debounce, production-ready manual override, production presence entities and all-away output are **not implemented**. Alpha 5 has only read-only shadow confirmation controls. Persisted shadow states are diagnostic-only and can be stale; a stored `away` state by itself never makes the internal all-away result true.
+
+## Alpha 5 — Conferma manuale senza zaino (solo shadow)
+
+Due pulsanti diagnostici per persona con zaino in **Priorità assoluta**:
+
+- **Conferma in casa senza zaino:** disponibile se lo zaino è OFF. Convalida manualmente HOME nonostante lo zaino assente e salva la conferma immediatamente.
+- **Revoca conferma senza zaino:** porta lo stato a non determinato, non ad AWAY. Il blocco di sicurezza sopravvive al riavvio finché non arriva una nuova prova di uscita (ad esempio un vero evento iPhone che lascia casa) o ritorna lo zaino.
+
+L'eccezione non scade mai trasformando automaticamente HOME in AWAY. Dopo otto ore è prevista soltanto una **richiesta di verifica** tramite `manual_review_required`. Quando lo zaino torna ON, la conferma termina automaticamente. Le entità sono sperimentali e non comandano mai allarme, riscaldamento, serratura o stati YAML.
+
+**Decisione rinviata al rilascio:** mantenere entrambe le modalità dello zaino o semplificare a una sola (issue #3).
 
 ## Files
 
@@ -51,6 +62,7 @@ Core FSM states, decision/event types, precedence between phone/Watch/physical i
 - `custom_components/family_presence/coordinator.py`: per-person serialized decisions, timestamp evidence, revisions, source fingerprinting and state snapshot export/restore.
 - `custom_components/family_presence/labels.py`: Italian human-readable decision reasons and backpack policies (without changing stored backend values).
 - `custom_components/family_presence/sensor.py`: read-only simulated presence state and diagnostic attributes (not for automations).
+- `custom_components/family_presence/button.py`: pulsanti diagnostici per la conferma manuale senza zaino.
 - `custom_components/family_presence/sources.py`: HA source subscriptions and normalization.
 - `custom_components/family_presence/config_flow.py`: household/person mapping and options.
 - `docs/baseline.md`: original YAML behavior.
@@ -62,6 +74,7 @@ Core FSM states, decision/event types, precedence between phone/Watch/physical i
 - `docs/alpha2-install.md`: Home Assistant helper-category fix and instructions for testing alpha 2.
 - `docs/alpha3-restart.md`: historical Alpha 3 restart diagnosis.
 - `docs/alpha4-independence.md`: independent FSM persistence, Italian diagnostics and Alpha 4 upgrade.
+- `docs/alpha5-manual-bag.md`: eccezione manuale shadow e casi di sicurezza.
 - `tests/`: pure unit tests; run `python -m unittest discover -s tests -v`.
 - `.github/workflows/validate.yml`: unit tests, hassfest and HACS validation.
 
