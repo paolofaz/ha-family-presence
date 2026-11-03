@@ -40,11 +40,34 @@ class ShadowAllAwayBinarySensor(BinarySensorEntity):
     @property
     def extra_state_attributes(self) -> dict:
         assessment = self.engine.household_assessment()
+        comparison = self.engine.legacy_comparison()
         return {
             "mode": "shadow_only",
             "do_not_use_for_automations": True,
             "not_the_legacy_casa_certamente_vuota": True,
             "aggregation_rule": "all_configured_members_away",
+            "legacy_comparison_status": comparison.status,
+            "legacy_expected_all_away": comparison.legacy_expected_all_away,
+            "aggregate_matches_legacy": comparison.aggregate_matches_legacy,
+            "legacy_divergence_since": (
+                self.engine.parity_diverged_since.isoformat()
+                if self.engine.parity_diverged_since else None
+            ),
+            "legacy_member_states": {
+                self.engine.people[key].name: value
+                for key, value in comparison.legacy_member_states.items()
+            },
+            "legacy_differing_members": [
+                self.engine.people[key].name for key in comparison.differing_members
+            ],
+            "legacy_missing_reference_members": [
+                self.engine.people[key].name
+                for key in comparison.missing_reference_members
+            ],
+            "legacy_unavailable_reference_members": [
+                self.engine.people[key].name
+                for key in comparison.unavailable_reference_members
+            ],
             "member_states": {
                 p.name: (
                     self.engine.state(key).value
