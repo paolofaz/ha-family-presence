@@ -121,12 +121,23 @@ class ShadowHouseholdSensor(SensorEntity):
     @property
     def extra_state_attributes(self) -> dict:
         assessment = self.engine.household_assessment()
+        comparison = self.engine.legacy_comparison()
         return {
             "mode": "shadow_only",
             "do_not_use_for_automations": True,
             "not_a_production_alarm_entity": True,
             "all_away_internal": self.engine.all_away(),
             "aggregation_rule": "all_configured_members_away",
+            "legacy_comparison_status": comparison.status,
+            "legacy_expected_all_away": comparison.legacy_expected_all_away,
+            "aggregate_matches_legacy": comparison.aggregate_matches_legacy,
+            "legacy_divergence_since": (
+                self.engine.parity_diverged_since.isoformat()
+                if self.engine.parity_diverged_since else None
+            ),
+            "legacy_differing_members": [
+                self.engine.people[key].name for key in comparison.differing_members
+            ],
             "source_warnings": {
                 self.engine.people[key].name: list(warnings)
                 for key, warnings in assessment.source_warnings.items()
