@@ -35,6 +35,11 @@ The shadow candidate-empty test refuses to rely on:
 - All configured relevant sources being unavailable
 - A bag ON without independent iPhone-outside evidence
 
+After a manual AWAY or an unverified restored AWAY, a *new, genuine* iPhone
+exit event can confirm the already-equal AWAY state and update its provenance.
+This is not a new state transition and cannot be done with an unavailable
+phone. The source adapter still requires an actual valid state change.
+
 A bag still ON **does not permanently veto** a genuine iPhone-away event;
 the bag may have been left at home. An AWAY value from the old YAML helper
 is never used to seed or validate the new FSM.
