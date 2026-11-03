@@ -56,6 +56,33 @@ class Alpha7ReadinessTests(unittest.IsolatedAsyncioTestCase):
         await engine.process("child", Event.IPHONE_LEFT, event_time=self.now)
         self.assertEqual(engine.household_assessment().status, "candidate_empty")
 
+    async def test_same_state_phone_event_cannot_verify_with_unavailable_phone(self):
+        engine = self.create()
+        await engine.force_state("child", State.AWAY)
+        self.now = self.now.replace(minute=32)
+        self.sources["phone"] = "unavailable"
+        self.assertIsNone(await engine.process(
+            "child", Event.IPHONE_LEFT, event_time=self.now,
+        ))
+        self.assertEqual(engine.runtime["child"].state_origin, "manual_force")
+        self.assertIsNone(engine.all_away())
+
+    async def test_new_phone_event_confirms_restored_same_state(self):
+        original = self.create()
+        await original.process("child", Event.IPHONE_LEFT, event_time=self.now)
+        restored = self.create()
+        self.assertEqual(restored.restore_snapshot(original.snapshot()), 1)
+        self.assertIsNone(restored.all_away())
+        self.now = self.now.replace(minute=33)
+        observed = await restored.process(
+            "child", Event.IPHONE_LEFT, event_time=self.now,
+        )
+        self.assertIsNotNone(observed)
+        self.assertEqual(observed.current, State.AWAY)
+        self.assertFalse(restored.runtime["child"].restored_from_storage)
+        self.assertEqual(restored.runtime["child"].state_origin, "observed_transition")
+        self.assertIs(restored.all_away(), True)
+
     async def test_manual_home_blocks_candidate_empty(self):
         engine = self.create()
         await engine.force_state("child", State.HOME)
