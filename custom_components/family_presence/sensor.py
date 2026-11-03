@@ -85,6 +85,7 @@ class ShadowPersonSensor(SensorEntity):
                 rt.last_ignored_at.isoformat() if rt.last_ignored_at else None
             ),
             "ignored_event_count": rt.ignored_count,
+            "recent_events": list(rt.recent_events[-12:]),
             "last_blocked_event": rt.last_blocked_event.value if rt.last_blocked_event else None,
             "last_blocked_at": rt.last_blocked_at.isoformat() if rt.last_blocked_at else None,
         }
