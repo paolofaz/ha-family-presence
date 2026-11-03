@@ -103,7 +103,7 @@ class ShadowPersonSensor(SensorEntity):
 
 
 class ShadowHouseholdSensor(SensorEntity):
-    """Explanatory candidate, NOT an occupancy or alarm automation trigger."""
+    """Explain the aggregate and raw sensor warnings without overriding it."""
 
     _attr_should_poll = False
     _attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -124,8 +124,13 @@ class ShadowHouseholdSensor(SensorEntity):
         return {
             "mode": "shadow_only",
             "do_not_use_for_automations": True,
-            "candidate_empty_is_not_alarm_permission": True,
+            "not_a_production_alarm_entity": True,
             "all_away_internal": self.engine.all_away(),
+            "aggregation_rule": "all_configured_members_away",
+            "source_warnings": {
+                self.engine.people[key].name: list(warnings)
+                for key, warnings in assessment.source_warnings.items()
+            },
             "member_diagnostics": {
                 self.engine.people[key].name: {
                     "state": self.engine.state(key).value
