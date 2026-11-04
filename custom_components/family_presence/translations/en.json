@@ -4,25 +4,23 @@
     "step": {
       "user": {
         "title": "Household",
-        "description": "Select shared sensors. RC2 publishes final states but external YAML controls the alarm.",
+        "description": "Select common household inputs. The Python FSM publishes final states; YAML automations continue to control the alarm.",
         "data": {
           "household_name": "Household name",
-          "gate_entities": "Gate sensors (optional)",
+          "gate_entities": "Gate events (switch, binary sensor or lock). For lock, a locked-to-unlocked transition counts as gate evidence, not confirmed physical opening.",
           "door_contact": "Door contact (optional)",
           "door_lock": "Door lock (optional)",
-          "alarm": "Alarm (optional)",
-          "legacy_all_away_binary": "Legacy Casa certamente vuota binary sensor (optional, comparison only)"
+          "alarm": "Alarm (optional)"
         }
       },
       "person": {
         "title": "Household member",
-        "description": "Map personal sources. The legacy FSM is a comparison reference only.",
+        "description": "Select personal sources. Legacy FSM comparison is no longer required.",
         "data": {
           "person_name": "Person name",
           "iphone_tracker": "Phone tracker (optional)",
           "watch_sensor": "BLE wearable sensor (optional)",
-          "bag_sensor": "Bag sensor (optional)",
-          "legacy_presence_entity": "Previous YAML FSM state (optional, comparison ONLY)"
+          "bag_sensor": "Bag sensor (optional)"
         }
       },
       "another": {
@@ -42,14 +40,13 @@
       },
       "reconfigure_shared": {
         "title": "Shared household sensors",
-        "description": "Edit common physical inputs without touching household members or YAML automations.",
+        "description": "Edit shared inputs, including optional gate lock entities.",
         "data": {
           "household_name": "Household name",
-          "gate_entities": "Gate sensors (optional)",
+          "gate_entities": "Gate events (switch, binary sensor or lock). For lock, a locked-to-unlocked transition counts as gate evidence, not confirmed physical opening.",
           "door_contact": "Door contact (optional)",
           "door_lock": "Door lock (optional)",
-          "alarm": "Alarm (optional)",
-          "legacy_all_away_binary": "Legacy Casa certamente vuota binary sensor (optional, comparison only)"
+          "alarm": "Alarm (optional)"
         }
       },
       "reconfigure_choose": {
@@ -65,8 +62,7 @@
           "person_name": "Person name",
           "iphone_tracker": "Phone tracker (optional)",
           "watch_sensor": "BLE wearable sensor (optional)",
-          "bag_sensor": "Bag sensor (optional)",
-          "legacy_presence_entity": "Legacy YAML presence helper (optional, shadow comparison only)"
+          "bag_sensor": "Bag sensor (optional)"
         }
       },
       "reconfigure_add": {
@@ -76,8 +72,7 @@
           "person_name": "Person name",
           "iphone_tracker": "Phone tracker (optional)",
           "watch_sensor": "BLE wearable sensor (optional)",
-          "bag_sensor": "Bag sensor (optional)",
-          "legacy_presence_entity": "Legacy YAML presence helper (optional, shadow comparison only)"
+          "bag_sensor": "Bag sensor (optional)"
         }
       },
       "reconfigure_remove": {
@@ -104,7 +99,7 @@
   "options": {
     "step": {
       "init": {
-        "title": "Family Presence RC2",
+        "title": "Family Presence RC5",
         "menu_options": {
           "windows": "Event correlation windows",
           "bag_person": "Backpack time windows"
