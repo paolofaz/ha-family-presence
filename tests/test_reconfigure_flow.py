@@ -32,9 +32,19 @@ class ReconfigureFlowTests(unittest.IsolatedAsyncioTestCase):
             "gate_entities": ["switch.gate"],
             "door_contact": "binary_sensor.door",
             "door_lock": "lock.front",
-        })
+        }, options={})
         self.flow = self.module.FamilyPresenceConfigFlow()
         self.flow._reconfigure_entry = self.entry
+
+    async def test_final_profile_blocks_configuration_changes(self):
+        self.entry.options = {"output_profile": "final"}
+        menu = await self.flow.async_step_reconfigure()
+        self.assertEqual(menu, {"type": "abort", "reason": "shadow_required"})
+        shared = await self.flow.async_step_reconfigure_shared({
+            "household_name": "Changed",
+        })
+        self.assertEqual(shared, {"type": "abort", "reason": "shadow_required"})
+        self.assertEqual(self.entry.data["household_name"], "Household")
 
     async def test_menu_exposes_shared_edit_add_and_remove(self):
         menu = await self.flow.async_step_reconfigure()
