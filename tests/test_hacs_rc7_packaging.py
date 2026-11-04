@@ -1,4 +1,4 @@
-"""HACS RC6 packaging must be self-contained and installable as a flat ZIP."""
+"""HACS RC7 packaging must be self-contained and installable as a flat ZIP."""
 import io
 import json
 from pathlib import Path
@@ -10,7 +10,7 @@ DOMAIN = "family_presence"
 COMPONENT = ROOT / "custom_components" / DOMAIN
 
 
-class HacsRC6PackagingTests(unittest.TestCase):
+class HacsRC7PackagingTests(unittest.TestCase):
     def test_single_integration_and_metadata_are_consistent(self):
         self.assertEqual([p.name for p in (ROOT / "custom_components").iterdir()
                           if p.is_dir()], [DOMAIN])
@@ -28,7 +28,7 @@ class HacsRC6PackagingTests(unittest.TestCase):
             manifest,
             "The root manifest must exactly match the shipped integration",
         )
-        self.assertEqual(manifest["version"], "0.1.0rc6")
+        self.assertEqual(manifest["version"], "0.1.0rc7")
 
     def test_hacs_update_repository_skips_missing_directory_lookup(self):
         """Model the early HACS integration.py manifest_path decision.
@@ -66,7 +66,7 @@ class HacsRC6PackagingTests(unittest.TestCase):
             self.assertIn("config_flow.py", names)
             self.assertNotIn("family_presence/manifest.json", names)
             manifest = json.loads(archive.read("manifest.json"))
-            self.assertEqual(manifest["version"], "0.1.0rc6")
+            self.assertEqual(manifest["version"], "0.1.0rc7")
 
 
 if __name__ == "__main__":

@@ -97,3 +97,19 @@ field validation with real devices, including delayed/offline BLE, false
 departures, event order, schedule boundaries and button press followed by a
 later sensor event. The existing YAML actions remain the only production
 alarm/heating controls.
+
+## RC7: public entity payload and Recorder noise
+
+Production member sensors expose only state, translated reason, last actual
+state transition, and optional backpack return eligibility. The all-away
+binary sensor has no extra state attributes. Household diagnostics only
+publish source warnings when present. Detailed ignored-event counters,
+source values and debug trails remain internal and are never exposed on
+production person sensors.
+
+The public sensor and aggregate entity callbacks cache their last visible
+(state, attributes) pair. Even if the coordinator notifies a listener about an
+ignored event or a BLE source change, the entity avoids a redundant
+`async_write_ha_state` unless its visible output changed. No clock-driven
+or per-second public attributes exist. History already stored in Home
+Assistant Recorder is not deleted by this change.
