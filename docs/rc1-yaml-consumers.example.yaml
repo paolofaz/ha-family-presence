@@ -1,0 +1,67 @@
+# ESEMPIO GENERICO — NON INCOLLARE DIRETTAMENTE IN HOME ASSISTANT.
+# Sostituire tutti gli entity_id qui sotto con quelli REALI del registro.
+# Non pubblicare il package familiare privato nel repository.
+# Utilizzare questa traccia solo DURANTE il cutover supervisionato.
+#
+# La FSM Python NON comanda gli attuatori. I seguenti consumer restano in YAML.
+automation:
+  - id: familyuscita_rc1_example
+    alias: "Esempio RC1 - Uscita famiglia"
+    mode: queued
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.family_presence_shadow_casa_certamente_vuota
+        from: "off"
+        to: "on"
+        id: casa_vuota
+      - trigger: state
+        entity_id: lock.example_door
+        to: "locked"
+        not_from: ["unknown", "unavailable"]
+        id: porta_locked
+    actions:
+      # Preservare anche la notifica riscaldamento nel package reale.
+      - if:
+          - condition: state
+            entity_id: binary_sensor.family_presence_shadow_casa_certamente_vuota
+            state: "on"
+          - condition: state
+            entity_id: lock.example_door
+            state: "locked"
+          - condition: state
+            entity_id: alarm_control_panel.example_alarm
+            state: "disarmed"
+        then:
+          - action: alarm_control_panel.alarm_arm_away
+            target:
+              entity_id: alarm_control_panel.example_alarm
+
+  - id: familyrientro_rc1_example
+    alias: "Esempio RC1 - Rientro famiglia"
+    mode: queued
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.example_member_1
+          - sensor.example_member_2
+          # Aggiungere TUTTI gli altri membri configurati.
+        to: "home"
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ trigger.from_state is not none
+             and trigger.from_state.state in ['away', 'near_home'] }}
+    actions:
+      - if:
+          - condition: template
+            value_template: >-
+              {{ states('alarm_control_panel.example_alarm')
+                 in ['arming', 'armed_away'] }}
+        then:
+          - action: alarm_control_panel.alarm_disarm
+            target:
+              entity_id: alarm_control_panel.example_alarm
+
+  # L'avviso porta del package originale mantiene il ritardo di due minuti
+  # e rivaluta binario e serratura PRIMA di notificare. Non eliminare
+  # l'automazione, ma sostituire solo il riferimento del binario.

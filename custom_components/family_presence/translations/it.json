@@ -1,0 +1,152 @@
+{
+  "title": "Presenza famiglia",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Abitazione",
+        "description": "Seleziona i sensori condivisi. La RC2 pubblica stati definitivi, ma l'allarme resta gestito dalle automazioni YAML.",
+        "data": {
+          "household_name": "Nome abitazione",
+          "gate_entities": "Sensori cancello (facoltativi)",
+          "door_contact": "Contatto porta (facoltativo)",
+          "door_lock": "Serratura (facoltativa)",
+          "alarm": "Allarme (facoltativo)",
+          "legacy_all_away_binary": "Casa certamente vuota YAML (solo confronto, facoltativo)"
+        }
+      },
+      "person": {
+        "title": "Componente della famiglia",
+        "description": "Associa le sorgenti personali. La vecchia FSM è soltanto un riferimento per il confronto.",
+        "data": {
+          "person_name": "Nome",
+          "iphone_tracker": "Tracker telefono (facoltativo)",
+          "watch_sensor": "Sensore BLE indossabile (facoltativo)",
+          "bag_sensor": "Sensore zaino (facoltativo)",
+          "legacy_presence_entity": "Stato FSM YAML precedente (facoltativo, SOLO confronto)"
+        }
+      },
+      "another": {
+        "title": "Altri componenti?",
+        "data": {
+          "add_another": "Aggiungi un'altra persona"
+        }
+      },
+      "reconfigure": {
+        "title": "Riconfigura famiglia",
+        "menu_options": {
+          "reconfigure_shared": "Sensori condivisi",
+          "reconfigure_choose": "Modifica una persona",
+          "reconfigure_add": "Aggiungi una persona",
+          "reconfigure_remove": "Rimuovi una persona"
+        }
+      },
+      "reconfigure_shared": {
+        "title": "Sensori condivisi dell'abitazione",
+        "description": "Modifica i sensori fisici, senza cambiare le persone né le automazioni YAML.",
+        "data": {
+          "household_name": "Nome abitazione",
+          "gate_entities": "Sensori cancello (facoltativi)",
+          "door_contact": "Contatto porta (facoltativo)",
+          "door_lock": "Serratura (facoltativa)",
+          "alarm": "Allarme (facoltativo)",
+          "legacy_all_away_binary": "Casa certamente vuota YAML (solo confronto, facoltativo)"
+        }
+      },
+      "reconfigure_choose": {
+        "title": "Seleziona la persona da modificare",
+        "data": {
+          "person": "Persona"
+        }
+      },
+      "reconfigure_edit": {
+        "title": "Modifica nome e sensori della persona",
+        "description": "I sensori BLE mantengono i loro timeout nelle integrazioni di origine. La politica dello zaino si modifica con Configura.",
+        "data": {
+          "person_name": "Nome",
+          "iphone_tracker": "Tracker telefono (facoltativo)",
+          "watch_sensor": "Sensore BLE indossabile (facoltativo)",
+          "bag_sensor": "Sensore zaino (facoltativo)",
+          "legacy_presence_entity": "Stato FSM YAML attuale (facoltativo, solo confronto)"
+        }
+      },
+      "reconfigure_add": {
+        "title": "Aggiungi una persona",
+        "description": "Configura almeno una sorgente; non verranno modificati gli stati reali.",
+        "data": {
+          "person_name": "Nome",
+          "iphone_tracker": "Tracker telefono (facoltativo)",
+          "watch_sensor": "Sensore BLE indossabile (facoltativo)",
+          "bag_sensor": "Sensore zaino (facoltativo)",
+          "legacy_presence_entity": "Stato FSM YAML attuale (facoltativo, solo confronto)"
+        }
+      },
+      "reconfigure_remove": {
+        "title": "Rimuovi una persona",
+        "description": "Rimuove solo la configurazione shadow di questa persona.",
+        "data": {
+          "person": "Persona da rimuovere"
+        }
+      }
+    },
+    "error": {
+      "invalid_name": "Inserisci un nome.",
+      "duplicate_name": "Nome già presente.",
+      "missing_sources": "Seleziona almeno una fonte di presenza.",
+      "duplicate_source": "Questa sorgente di presenza è già assegnata a un'altra persona.",
+      "invalid_person": "Seleziona una persona valida."
+    },
+    "abort": {
+      "already_configured": "Abitazione già configurata.",
+      "person_not_found": "Persona non trovata.",
+      "last_member": "Deve rimanere almeno una persona configurata."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Presenza famiglia RC2",
+        "menu_options": {
+          "windows": "Finestre temporali",
+          "bag_person": "Orari e giorni degli zaini"
+        }
+      },
+      "windows": {
+        "title": "Finestre di correlazione",
+        "description": "Intervalli in secondi usati dalla FSM. I timeout Bluetooth si impostano nelle integrazioni BLE.",
+        "data": {
+          "exit_gate_seconds": "Uscita: cancello",
+          "exit_door_seconds": "Uscita: chiusura porta",
+          "exit_lock_seconds": "Uscita: serratura",
+          "entry_gate_seconds": "Rientro: cancello",
+          "entry_door_seconds": "Rientro: apertura porta",
+          "entry_lock_seconds": "Rientro: sblocco porta"
+        }
+      },
+      "bag_person": {
+        "title": "Scegli la persona per lo zaino",
+        "description": "Seleziona la persona per la quale vuoi modificare la precedenza dello zaino.",
+        "data": {
+          "person": "Componente della famiglia"
+        }
+      },
+      "bag_schedule": {
+        "title": "Orari dello zaino",
+        "description": "Configura lo zaino di {person}. ON→OFF produce Fuori casa soltanto durante gli orari e giorni scelti. OFF→ON produce In casa a qualsiasi ora. Se disabilitato, lo zaino non influenza la presenza. Inizio e fine uguali (ad esempio 00:00–00:00) indicano 24 ore.",
+        "data": {
+          "enabled": "Abilita zaino",
+          "start": "Ora inizio",
+          "end": "Ora fine",
+          "days": "Giorni attivi"
+        }
+      }
+    },
+    "error": {
+      "invalid_person": "Persona non disponibile.",
+      "invalid_policy": "Regola dello zaino non valida.",
+      "invalid_schedule": "Impostazioni orario dello zaino non valide."
+    },
+    "abort": {
+      "person_not_found": "La persona non è più disponibile o non ha uno zaino configurato."
+    }
+  }
+}

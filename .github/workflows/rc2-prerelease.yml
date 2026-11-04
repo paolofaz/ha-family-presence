@@ -1,0 +1,85 @@
+name: Publish RC2 latest
+on:
+  push:
+    branches:
+      - release/0.1.0rc2
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: family-presence-rc2-latest
+  cancel-in-progress: false
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m unittest discover -s tests -v
+      - run: python -m compileall -q custom_components tests
+
+  validate-hacs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration
+
+  hassfest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  promote-latest:
+    needs: [unit-tests, validate-hacs, hassfest]
+    if: github.repository == 'paolofaz/ha-family-presence'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify release tag and manifest (do not retag)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CURRENT=$(git ls-remote --exit-code origin refs/heads/release/0.1.0rc2 | cut -f1)
+          if [ "$CURRENT" != "$GITHUB_SHA" ]; then
+            echo "::error::Another RC2 commit exists: refusing promotion"
+            exit 1
+          fi
+          python -c "import json; from pathlib import Path; assert json.loads(Path('custom_components/family_presence/manifest.json').read_text())['version'] == '0.1.0rc2'"
+          TAG_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v0.1.0rc2" --jq '.object.sha')
+          if [ "$TAG_SHA" != "8566ce687364d8ad9e1402bfb0b5bb508d90d4f2" ]; then
+            echo "::error::Existing tag differs from tested RC2 commit"
+            exit 1
+          fi
+          if ! git diff --quiet "$TAG_SHA" "$GITHUB_SHA" -- custom_components; then
+            echo "::error::Integration code differs from released RC2 tag"
+            exit 1
+          fi
+          gh release view v0.1.0rc2 --repo "$GITHUB_REPOSITORY" >/dev/null
+      - name: Promote existing RC2 to a normal release and Latest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit v0.1.0rc2 \
+            --repo "$GITHUB_REPOSITORY" \
+            --prerelease=false \
+            --latest
+          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name')
+          IS_PRERELEASE=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/v0.1.0rc2" --jq '.prerelease')
+          if [ "$LATEST" != "v0.1.0rc2" ] || [ "$IS_PRERELEASE" != "false" ]; then
+            echo "::error::Release promotion not confirmed"
+            exit 1
+          fi
