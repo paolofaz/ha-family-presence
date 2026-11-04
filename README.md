@@ -5,11 +5,11 @@ macchina a stati finiti (FSM) indipendente per ogni persona. Gli stati pubblici
 sono `home`, `near_home`, `away`. L'integrazione produce informazioni di
 presenza: non comanda allarme, serrature, cancello o riscaldamento.
 
-> **Latest: v0.1.0rc7.** La release ufficiale conserva il packaging HACS
+> **Latest: v0.1.0rc8.** La release ufficiale conserva il packaging HACS
 > collaudato dalla RC4: manifest alla radice del repository,
 > `hacs.json` con `content_in_root: true` e `zip_release: true`,
 > archivio piatto `family_presence.zip`.
-> [Note RC7](docs/rc7-release-it.md).
+> [Note RC8](docs/rc8-release-it.md).
 
 ## Entità
 
@@ -25,6 +25,7 @@ Ogni persona ha un sensore autonomo `Presenza [nome]` con stato
 | Sensore presenza (con zaino) | `reason`, `last_transition`, `bag_return_eligible` |
 | `Casa certamente vuota` | Nessun attributo extra: il valore è `on` / `off` |
 | `Diagnostica presenza` | Solo `source_warnings` quando ci sono anomalie |
+| `Ultimi eventi accessi` | Ultimi orari per ciascun cancello, porta e serratura configurati |
 
 Il motivo `reason` è presentato in italiano. `last_transition` è il
 timestamp ISO della **transizione di stato**, non un contatore che aumenta
@@ -42,6 +43,27 @@ dell'aggregato se non cambia nulla di visibile.
 Gli eventi dettagliati e i relativi contatori restano nella memoria della
 FSM per la gestione interna e nei suoi snapshot, ma non sono attributi
 pubblici che fanno crescere inutilmente la cronologia.
+
+### Ultimi eventi accessi (RC8)
+
+La nuova entità diagnostica **Ultimi eventi accessi** è disponibile sotto
+**Casa** quando è configurato almeno un cancello, contatto porta o lock.
+Mostra l'ultimo tipo di evento rilevato (ad esempio `Porta aperta`) e gli
+attributi:
+
+- `cancelli`: mappa dei timestamp ISO per ciascun `entity_id` di cancello,
+  compresi i gate configurati tramite `lock`. Uno sblocco è un evento di
+  azionamento, non la conferma che il cancello sia fisicamente aperto.
+- `porta_aperta` e `porta_chiusa` (se configurato il contatto porta).
+- `serratura_sbloccata` e `serratura_bloccata` (se configurato il lock).
+- `ultimo_evento_alle` e `ultima_sorgente`.
+
+Questi valori sono **persistenti** in uno Store indipendente e cambiano solo
+in seguito a un evento fisico valido. La FSM conserva separatamente i propri
+timestamp di correlazione in RAM: i valori ripristinati **non sono mai
+riutilizzati** per decidere HOME/AWAY. Nessun sensore aggiuntivo copia lo
+stato istantaneo di switch, contatti o lock; per quello usa le entità HA
+originali. Dettagli: [RC8](docs/rc8-release-it.md).
 
 ## Logica essenziale
 

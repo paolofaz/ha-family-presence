@@ -1,4 +1,4 @@
-name: Validate and publish RC7 Latest
+name: Validate and publish RC8 Latest
 on:
   push:
     branches:
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: family-presence-rc7-main-release
+  group: family-presence-rc8-main-release
   cancel-in-progress: false
 
 jobs:
@@ -61,7 +61,7 @@ jobs:
           manifest = json.loads(Path("custom_components/family_presence/manifest.json").read_text())
           metadata = json.loads(Path("hacs.json").read_text())
           assert manifest["domain"] == "family_presence"
-          assert manifest["version"] == "0.1.0rc7"
+          assert manifest["version"] == "0.1.0rc8"
           assert metadata["zip_release"] is True
           assert metadata["content_in_root"] is True
           assert json.loads(Path("manifest.json").read_text()) == manifest
@@ -87,35 +87,35 @@ jobs:
               assert "__init__.py" in paths
               assert "config_flow.py" in paths
               assert "family_presence/manifest.json" not in paths
-              assert json.loads(archive.read("manifest.json"))["version"] == "0.1.0rc7"
+              assert json.loads(archive.read("manifest.json"))["version"] == "0.1.0rc8"
               assert json.loads(archive.read("manifest.json")) == json.loads(Path("manifest.json").read_text())
               print(f"Validated HACS ZIP with {len(paths)} integration files")
           PY
           sha256sum family_presence.zip
-      - name: Publish standard RC7 release as Latest
+      - name: Publish standard RC8 release as Latest
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view v0.1.0rc7 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            TAG_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v0.1.0rc7" --jq '.object.sha')
+          if gh release view v0.1.0rc8 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            TAG_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v0.1.0rc8" --jq '.object.sha')
             if [ "$TAG_SHA" != "$GITHUB_SHA" ]; then
-              echo "::error::RC7 tag already points to a different commit"
+              echo "::error::RC8 tag already points to a different commit"
               exit 1
             fi
-            gh release upload v0.1.0rc7 family_presence.zip --repo "$GITHUB_REPOSITORY" --clobber
-            gh release edit v0.1.0rc7 --repo "$GITHUB_REPOSITORY" --prerelease=false --latest
+            gh release upload v0.1.0rc8 family_presence.zip --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit v0.1.0rc8 --repo "$GITHUB_REPOSITORY" --prerelease=false --latest
           else
-            gh release create v0.1.0rc7 family_presence.zip \
+            gh release create v0.1.0rc8 family_presence.zip \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
-              --title "Family Presence v0.1.0rc7 — HACS installabile" \
-              --notes-file docs/rc7-release-it.md \
+              --title "Family Presence v0.1.0rc8 — HACS installabile" \
+              --notes-file docs/rc8-release-it.md \
               --latest
           fi
           LATEST=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name')
-          ASSET=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/v0.1.0rc7" --jq '.assets[].name')
-          if [ "$LATEST" != "v0.1.0rc7" ] || [ "$ASSET" != "family_presence.zip" ]; then
+          ASSET=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/v0.1.0rc8" --jq '.assets[].name')
+          if [ "$LATEST" != "v0.1.0rc8" ] || [ "$ASSET" != "family_presence.zip" ]; then
             echo "::error::Latest or ZIP asset could not be verified"
             exit 1
           fi
