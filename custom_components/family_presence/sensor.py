@@ -8,6 +8,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import ShadowCoordinator
 from .labels import reason_label
+from .presentation import FINAL, person_presentation, household_presentation
 
 
 async def async_setup_entry(
@@ -32,8 +33,9 @@ class ShadowPersonSensor(SensorEntity):
     def __init__(self, entry_id: str, engine: ShadowCoordinator, person: str) -> None:
         self.engine = engine
         self.person = person
-        self._attr_name = f"Family Presence Shadow {engine.people[person].name}"
-        self._attr_unique_id = f"{entry_id}_{person}_shadow"
+        presentation = person_presentation(entry_id, person, engine.people[person].name)
+        self._attr_name = presentation.name
+        self._attr_unique_id = presentation.unique_id
 
     @property
     def native_value(self) -> str | None:
@@ -50,6 +52,9 @@ class ShadowPersonSensor(SensorEntity):
         return {
             "mode": "shadow_only",
             "do_not_use_for_automations": True,
+            "planned_final_name": person_presentation(
+                "_preview_", self.person, p.name, FINAL
+            ).name,
             "reason": reason_label(rt.last_reason),
             "reason_origin": rt.reason_origin,
             "state_origin": rt.state_origin,
@@ -111,8 +116,9 @@ class ShadowHouseholdSensor(SensorEntity):
 
     def __init__(self, entry_id: str, engine: ShadowCoordinator) -> None:
         self.engine = engine
-        self._attr_unique_id = f"{entry_id}_household_readiness_shadow"
-        self._attr_name = "Family Presence Shadow - Diagnostica casa"
+        presentation = household_presentation(entry_id)
+        self._attr_unique_id = presentation.unique_id
+        self._attr_name = presentation.name
 
     @property
     def native_value(self) -> str:
