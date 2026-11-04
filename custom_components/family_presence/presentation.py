@@ -1,8 +1,7 @@
-"""Presentation-only profiles for the Family Presence cutover.
+"""Presentation profiles with final RC2 output names.
 
-The release candidate is locked in shadow presentation. Final labels are
-defined here for later activation *after* the legacy YAML writers have been
-disabled and Home Assistant entity registry IDs have been audited.
+Final is the runtime default. Historical Shadow labels remain internal for
+testing identity preservation and upgrading existing entries.
 
 IMPORTANT: changing display names does NOT automatically rename entity_id
 in Home Assistant. Unique IDs must stay stable between presentations.
@@ -13,7 +12,7 @@ from dataclasses import dataclass
 
 SHADOW = "shadow"
 FINAL = "final"
-DEFAULT_PROFILE = SHADOW
+DEFAULT_PROFILE = FINAL
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +34,7 @@ def person_presentation(entry_id: str, person_key: str, name: str,
     _check_profile(profile)
     return Presentation(
         name=(f"Family Presence Shadow {name}"
-              if profile == SHADOW else f"Presenza {name}"),
+              if profile == SHADOW else f"Presenza famiglia {name}"),
         unique_id=f"{entry_id}_{person_key}_shadow",
         diagnostic=profile == SHADOW,
     )
@@ -46,7 +45,7 @@ def aggregate_presentation(entry_id: str,
     _check_profile(profile)
     return Presentation(
         name=("Family Presence Shadow - Casa certamente vuota"
-              if profile == SHADOW else "Casa certamente vuota"),
+              if profile == SHADOW else "Presenza famiglia - Casa certamente vuota"),
         unique_id=f"{entry_id}_all_away_shadow",
         diagnostic=profile == SHADOW,
     )
@@ -57,7 +56,7 @@ def household_presentation(entry_id: str,
     _check_profile(profile)
     return Presentation(
         name=("Family Presence Shadow - Diagnostica casa"
-              if profile == SHADOW else "Family Presence - Diagnostica casa"),
+              if profile == SHADOW else "Presenza famiglia - Diagnostica casa"),
         unique_id=f"{entry_id}_household_readiness_shadow",
         diagnostic=True,  # A diagnostic even after final cutover.
     )
@@ -69,7 +68,7 @@ def force_presentation(entry_id: str, person_key: str, name: str,
     if target not in ("home", "away"):
         raise ValueError("A manual button can only force home or away")
     action = "Forza a casa" if target == "home" else "Forza fuori casa"
-    prefix = f"Family Presence Shadow {name}" if profile == SHADOW else f"Presenza {name}"
+    prefix = f"Family Presence Shadow {name}" if profile == SHADOW else f"Presenza famiglia {name}"
     return Presentation(
         name=f"{prefix} — {action}",
         unique_id=f"{entry_id}_{person_key}_shadow_force_{target}",

@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Abitazione",
-        "description": "Seleziona i sensori comuni. La beta rimane in modalità ombra: nessun comando all'allarme.",
+        "description": "Seleziona i sensori condivisi. La RC2 pubblica stati definitivi, ma l'allarme resta gestito dalle automazioni YAML.",
         "data": {
           "household_name": "Nome abitazione",
           "gate_entities": "Sensori cancello (facoltativi)",
@@ -16,7 +16,7 @@
       },
       "person": {
         "title": "Componente della famiglia",
-        "description": "Associa le sorgenti di presenza. Configura la fascia dello zaino dopo l'installazione. Il vecchio YAML serve soltanto al confronto.",
+        "description": "Associa le sorgenti personali. La vecchia FSM è soltanto un riferimento per il confronto.",
         "data": {
           "person_name": "Nome",
           "iphone_tracker": "Tracker telefono (facoltativo)",
@@ -98,18 +98,16 @@
     "abort": {
       "already_configured": "Abitazione già configurata.",
       "person_not_found": "Persona non trovata.",
-      "last_member": "Deve rimanere almeno una persona configurata.",
-      "shadow_required": "Torna in Shadow prima di riconfigurare persone e sorgenti."
+      "last_member": "Deve rimanere almeno una persona configurata."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Impostazioni Family Presence",
+        "title": "Presenza famiglia RC2",
         "menu_options": {
           "windows": "Finestre temporali",
-          "bag_person": "Orari e giorni degli zaini",
-          "activation": "Attivazione / ritorno a Shadow (RC1)"
+          "bag_person": "Orari e giorni degli zaini"
         }
       },
       "windows": {
@@ -140,25 +138,15 @@
           "end": "Ora fine",
           "days": "Giorni attivi"
         }
-      },
-      "activation": {
-        "title": "RC1 — modalità entità",
-        "description": "Modalità attuale: {mode}. Entità aggregata / esito controlli: {aggregate}. Soltanto DOPO backup e revisione del piano cutover YAML digita {command}. Questo comando non modifica automazioni, entity_id o allarme. Tornare a Shadow non scollega le automazioni YAML!",
-        "data": {
-          "confirmation": "Conferma testuale"
-        }
       }
     },
     "error": {
       "invalid_person": "Persona non disponibile.",
       "invalid_policy": "Regola dello zaino non valida.",
-      "invalid_schedule": "Impostazioni orario dello zaino non valide.",
-      "invalid_confirmation": "Digita esattamente il comando indicato.",
-      "registry_unready": "Registro entità non pronto: controllare i riferimenti segnalati."
+      "invalid_schedule": "Impostazioni orario dello zaino non valide."
     },
     "abort": {
-      "person_not_found": "La persona non è più disponibile o non ha uno zaino configurato.",
-      "shadow_required": "Torna in Shadow prima di modificare sorgenti e regole."
+      "person_not_found": "La persona non è più disponibile o non ha uno zaino configurato."
     }
   }
 }

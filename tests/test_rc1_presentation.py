@@ -12,18 +12,18 @@ from custom_components.family_presence.presentation import (
 
 class RC1PresentationTests(unittest.TestCase):
     def test_shadow_remains_default_and_identical_to_beta1(self):
-        self.assertEqual(DEFAULT_PROFILE, SHADOW)
-        person = person_presentation("entry123", "paolo", "Paolo")
+        self.assertEqual(DEFAULT_PROFILE, FINAL)
+        person = person_presentation("entry123", "paolo", "Paolo", SHADOW)
         self.assertEqual(person.name, "Family Presence Shadow Paolo")
         self.assertEqual(person.unique_id, "entry123_paolo_shadow")
         self.assertTrue(person.diagnostic)
 
-        all_away = aggregate_presentation("entry123")
+        all_away = aggregate_presentation("entry123", SHADOW)
         self.assertEqual(all_away.name, "Family Presence Shadow - Casa certamente vuota")
         self.assertEqual(all_away.unique_id, "entry123_all_away_shadow")
         self.assertTrue(all_away.diagnostic)
 
-        house = household_presentation("entry123")
+        house = household_presentation("entry123", SHADOW)
         self.assertEqual(house.name, "Family Presence Shadow - Diagnostica casa")
         self.assertEqual(house.unique_id, "entry123_household_readiness_shadow")
 
@@ -34,14 +34,14 @@ class RC1PresentationTests(unittest.TestCase):
         ):
             old = person_presentation("entry123", key, name, SHADOW)
             new = person_presentation("entry123", key, name, FINAL)
-            self.assertEqual(new.name, f"Presenza {name}")
+            self.assertEqual(new.name, f"Presenza famiglia {name}")
             self.assertFalse(new.diagnostic)
             self.assertTrue(old.diagnostic)
             self.assertEqual(new.unique_id, old.unique_id)
 
         old_empty = aggregate_presentation("entry123", SHADOW)
         new_empty = aggregate_presentation("entry123", FINAL)
-        self.assertEqual(new_empty.name, "Casa certamente vuota")
+        self.assertEqual(new_empty.name, "Presenza famiglia - Casa certamente vuota")
         self.assertEqual(old_empty.unique_id, new_empty.unique_id)
         self.assertFalse(new_empty.diagnostic)
 
@@ -75,9 +75,9 @@ class RC1PresentationTests(unittest.TestCase):
         # Important invariant: setting a future display name does NOT claim a
         # HA entity_id and does not activate any automation.
         self.assertEqual(person_presentation("e", "p", "Paolo").name,
-                         "Family Presence Shadow Paolo")
+                         "Presenza famiglia Paolo")
         self.assertEqual(aggregate_presentation("e").name,
-                         "Family Presence Shadow - Casa certamente vuota")
+                         "Presenza famiglia - Casa certamente vuota")
 
 
 if __name__ == "__main__":

@@ -9,9 +9,10 @@ from custom_components.family_presence.presentation import FINAL, SHADOW
 
 class OperationalTests(unittest.TestCase):
     def test_shadow_is_default_and_invalid_input_fails_closed(self):
-        self.assertEqual(profile_from_options({}), SHADOW)
-        self.assertEqual(profile_from_options({"output_profile": "invalid"}), SHADOW)
+        self.assertEqual(profile_from_options({}), FINAL)
+        self.assertEqual(profile_from_options({"output_profile": "invalid"}), FINAL)
         self.assertEqual(profile_from_options({"output_profile": FINAL}), FINAL)
+        self.assertEqual(profile_from_options({"output_profile": SHADOW}), FINAL)
 
     def test_audit_uses_registered_not_guessed_entity_ids(self):
         mapping = {

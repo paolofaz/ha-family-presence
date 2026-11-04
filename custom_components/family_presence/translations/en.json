@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Household",
-        "description": "Select shared inputs. The beta stays in shadow mode: no alarm commands.",
+        "description": "Select shared sensors. RC2 publishes final states but external YAML controls the alarm.",
         "data": {
           "household_name": "Household name",
           "gate_entities": "Gate sensors (optional)",
@@ -16,7 +16,7 @@
       },
       "person": {
         "title": "Household member",
-        "description": "Map presence sources. Configure the backpack time window after installation. Legacy YAML is only for comparison.",
+        "description": "Map personal sources. The legacy FSM is a comparison reference only.",
         "data": {
           "person_name": "Person name",
           "iphone_tracker": "Phone tracker (optional)",
@@ -98,18 +98,16 @@
     "abort": {
       "already_configured": "Household is already configured.",
       "person_not_found": "Household member not found.",
-      "last_member": "At least one household member must remain.",
-      "shadow_required": "Return to Shadow before changing people or sensor inputs."
+      "last_member": "At least one household member must remain."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Family Presence settings",
+        "title": "Family Presence RC2",
         "menu_options": {
           "windows": "Event correlation windows",
-          "bag_person": "Backpack time windows",
-          "activation": "RC1 activation / return to Shadow"
+          "bag_person": "Backpack time windows"
         }
       },
       "windows": {
@@ -140,25 +138,15 @@
           "end": "End time",
           "days": "Active weekdays"
         }
-      },
-      "activation": {
-        "title": "RC1 — output profile",
-        "description": "Current mode: {mode}. Aggregate output / preflight: {aggregate}. Only AFTER backup and review of the YAML cutover plan, type {command}. This does not edit automations, entity IDs or alarm. Returning to Shadow does not disconnect YAML automations!",
-        "data": {
-          "confirmation": "Typed confirmation"
-        }
       }
     },
     "error": {
       "invalid_person": "Person not available.",
       "invalid_policy": "Invalid backpack policy.",
-      "invalid_schedule": "Invalid backpack schedule.",
-      "invalid_confirmation": "Type the exact shown command.",
-      "registry_unready": "Entity registry is not ready: check listed mappings."
+      "invalid_schedule": "Invalid backpack schedule."
     },
     "abort": {
-      "person_not_found": "The person is no longer available or has no configured backpack.",
-      "shadow_required": "Return to Shadow before changing source mappings and policies."
+      "person_not_found": "The person is no longer available or has no configured backpack."
     }
   }
 }

@@ -9,8 +9,8 @@ from .presentation import FINAL, SHADOW, aggregate_presentation, person_presenta
 
 
 def profile_from_options(options: Mapping[str, object]) -> str:
-    """Absent/invalid configuration always stays Beta-1-compatible Shadow."""
-    return FINAL if options.get(CONF_OUTPUT_PROFILE) == FINAL else SHADOW
+    """RC2 always exposes Final outputs; old RC1 options cannot override it."""
+    return FINAL
 
 
 @dataclass(frozen=True, slots=True)
