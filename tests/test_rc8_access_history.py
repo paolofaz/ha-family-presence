@@ -7,6 +7,7 @@ import unittest
 
 from custom_components.family_presence.access_history import AccessHistory
 from custom_components.family_presence.coordinator import PersonSources, ShadowCoordinator
+from custom_components.family_presence.fsm import State
 from test_source_adapter import FakeHA, ha_event, load_source_module
 from test_shadow_sensor import load_sensor_module
 
@@ -182,7 +183,7 @@ class AccessHistoryTests(unittest.IsolatedAsyncioTestCase):
             self.now.isoformat(),
         )
         # Unrelated FSM updates do not affect this diagnostic sensor.
-        await self.engine.force_state("paolo", self.module.Event.MANUAL_AWAY.value)
+        await self.engine.force_state("paolo", State.AWAY)
         sensor._access_updated()
         self.assertEqual(len(calls), 1)
 
