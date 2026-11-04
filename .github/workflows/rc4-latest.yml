@@ -35,6 +35,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Exclude repository-only root HACS manifest from HA integration scan
+        run: rm manifest.json
       - uses: home-assistant/actions/hassfest@master
 
   publish-latest:

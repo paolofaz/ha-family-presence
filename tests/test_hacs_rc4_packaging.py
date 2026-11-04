@@ -18,6 +18,8 @@ class HacsRC4PackagingTests(unittest.TestCase):
         manifest = json.loads((COMPONENT / "manifest.json").read_text(encoding="utf-8"))
         self.assertTrue(metadata["zip_release"])
         self.assertTrue(metadata["content_in_root"])
+        self.assertEqual((ROOT / "brand" / "icon.png").read_bytes(),
+                         (COMPONENT / "brand" / "icon.png").read_bytes())
         self.assertEqual(metadata["filename"], "family_presence.zip")
         self.assertTrue(metadata["hide_default_branch"])
         self.assertEqual(manifest["domain"], DOMAIN)
