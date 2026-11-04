@@ -12,6 +12,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .fsm import State
+from .devices import member_device_info
 from .presentation import SHADOW, force_presentation
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,6 +46,8 @@ class ShadowForceButton(ButtonEntity):
         presentation = force_presentation(entry_id, person, name, target.value, self.profile)
         self._attr_unique_id = presentation.unique_id
         self._attr_name = presentation.name
+        self._attr_has_entity_name = True
+        self._attr_device_info = member_device_info(entry_id, person, name)
         self._attr_entity_category = EntityCategory.DIAGNOSTIC if presentation.diagnostic else None
         self._attr_icon = "mdi:home-import-outline" if target == State.HOME else "mdi:home-export-outline"
 

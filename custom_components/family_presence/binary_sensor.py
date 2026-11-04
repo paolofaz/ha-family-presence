@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import ShadowCoordinator
+from .devices import household_device_info
 from .presentation import SHADOW, FINAL, aggregate_presentation
 
 
@@ -39,6 +40,8 @@ class ShadowAllAwayBinarySensor(BinarySensorEntity):
         presentation = aggregate_presentation(entry_id, profile)
         self._attr_name = presentation.name
         self._attr_unique_id = presentation.unique_id
+        self._attr_has_entity_name = True
+        self._attr_device_info = household_device_info(entry_id)
         self._attr_entity_category = EntityCategory.DIAGNOSTIC if presentation.diagnostic else None
 
     @property
@@ -49,7 +52,7 @@ class ShadowAllAwayBinarySensor(BinarySensorEntity):
     def extra_state_attributes(self) -> dict:
         assessment = self.engine.household_assessment()
         comparison = self.engine.legacy_comparison()
-        return {
+        data = {
             "mode": "shadow_only" if self.profile == SHADOW else "final",
             "do_not_use_for_automations": self.profile == SHADOW,
             "not_the_legacy_casa_certamente_vuota": self.profile == SHADOW,
@@ -105,6 +108,11 @@ class ShadowAllAwayBinarySensor(BinarySensorEntity):
                 for key, warnings in assessment.source_warnings.items()
             },
         }
+        if self.profile == FINAL:
+            for key in ["planned_final_name","not_the_legacy_casa_certamente_vuota","entity_id_review_required","legacy_comparison_status","legacy_expected_all_away","aggregate_matches_legacy","actual_legacy_state","actual_legacy_all_away","actual_legacy_matches_expected","actual_legacy_matches_shadow","legacy_divergence_since","legacy_member_states","legacy_differing_members","legacy_missing_reference_members","legacy_unavailable_reference_members"]:
+                data.pop(key, None)
+        return data
+
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()

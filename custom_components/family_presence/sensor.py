@@ -8,6 +8,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import ShadowCoordinator
 from .labels import reason_label
+from .devices import member_device_info, household_device_info
 from .presentation import FINAL, SHADOW, person_presentation, household_presentation
 
 
@@ -39,6 +40,8 @@ class ShadowPersonSensor(SensorEntity):
         presentation = person_presentation(entry_id, person, engine.people[person].name, profile)
         self._attr_name = presentation.name
         self._attr_unique_id = presentation.unique_id
+        self._attr_has_entity_name = True
+        self._attr_device_info = member_device_info(entry_id, person, engine.people[person].name)
         self._attr_entity_category = EntityCategory.DIAGNOSTIC if presentation.diagnostic else None
 
     @property
@@ -52,8 +55,8 @@ class ShadowPersonSensor(SensorEntity):
         p = self.engine.people[self.person]
         rt = self.engine.runtime[self.person]
         bag = self.engine._read(p.bag) if p.bag else None
-        legacy = self.engine._read(p.reference) if p.reference else None
-        return {
+        legacy = self.engine._read(p.reference) if self.profile == SHADOW and p.reference else None
+        data = {
             "mode": "shadow_only" if self.profile == SHADOW else "final",
             "do_not_use_for_automations": self.profile == SHADOW,
             "cutover_active": self.profile == FINAL,
@@ -100,6 +103,11 @@ class ShadowPersonSensor(SensorEntity):
             "last_blocked_event": rt.last_blocked_event.value if rt.last_blocked_event else None,
             "last_blocked_at": rt.last_blocked_at.isoformat() if rt.last_blocked_at else None,
         }
+        if self.profile == FINAL:
+            for key in ["planned_final_name","legacy_state","matches_legacy","comparison_status","divergence_since"]:
+                data.pop(key, None)
+        return data
+
 
     async def async_added_to_hass(self) -> None:
         """Subscribe after Home Assistant has added the entity."""
@@ -126,6 +134,8 @@ class ShadowHouseholdSensor(SensorEntity):
         presentation = household_presentation(entry_id, profile)
         self._attr_unique_id = presentation.unique_id
         self._attr_name = presentation.name
+        self._attr_has_entity_name = True
+        self._attr_device_info = household_device_info(entry_id)
 
     @property
     def native_value(self) -> str:
@@ -135,7 +145,7 @@ class ShadowHouseholdSensor(SensorEntity):
     def extra_state_attributes(self) -> dict:
         assessment = self.engine.household_assessment()
         comparison = self.engine.legacy_comparison()
-        return {
+        data = {
             "mode": "shadow_only" if self.profile == SHADOW else "final",
             "do_not_use_for_automations": True,
             "not_a_production_alarm_entity": True,
@@ -177,6 +187,11 @@ class ShadowHouseholdSensor(SensorEntity):
                 self.engine.people[key].name for key in assessment.divergent
             ],
         }
+        if self.profile == FINAL:
+            for key in ["legacy_comparison_status","legacy_expected_all_away","aggregate_matches_legacy","actual_legacy_state","actual_legacy_all_away","actual_legacy_matches_expected","actual_legacy_matches_shadow","legacy_divergence_since","legacy_differing_members","divergent_members"]:
+                data.pop(key, None)
+        return data
+
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
