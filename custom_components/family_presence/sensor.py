@@ -7,6 +7,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import ShadowCoordinator
+from .access_history import AccessHistory
 from .labels import reason_label
 from .visible_updates import capture_visible_state, async_write_if_visible_changed
 from .devices import household_device_info
@@ -19,11 +20,15 @@ async def async_setup_entry(
     """Expose one diagnostically marked shadow sensor per configured person."""
     engine = entry.runtime_data.engine
     profile = getattr(entry.runtime_data, "profile", SHADOW)
-    async_add_entities([
+    entities = [
         *(ShadowPersonSensor(entry.entry_id, engine, person_id, profile)
           for person_id in engine.people),
         ShadowHouseholdSensor(entry.entry_id, engine, profile),
-    ])
+    ]
+    history = getattr(entry.runtime_data, "access_history", None)
+    if history is not None and history.has_sources:
+        entities.append(AccessHistorySensor(entry.entry_id, history))
+    async_add_entities(entities)
 
 
 class ShadowPersonSensor(SensorEntity):
@@ -227,4 +232,37 @@ class ShadowHouseholdSensor(SensorEntity):
 
     @callback
     def _updated(self, _person: str) -> None:
+        async_write_if_visible_changed(self, self.native_value)
+
+
+class AccessHistorySensor(SensorEntity):
+    """Display-only recent access events, never reused as FSM evidence."""
+
+    _attr_should_poll = False
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:door-open"
+
+    def __init__(self, entry_id: str, history: AccessHistory) -> None:
+        self.history = history
+        self._attr_unique_id = f"{entry_id}_last_access_events"
+        self._attr_name = "Ultimi eventi accessi"
+        self._attr_has_entity_name = True
+        self._attr_device_info = household_device_info(entry_id)
+        self._last_visible_state = capture_visible_state(self, self.native_value)
+
+    @property
+    def native_value(self) -> str:
+        return self.history.state
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return self.history.attributes
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self._last_visible_state = capture_visible_state(self, self.native_value)
+        self.async_on_remove(self.history.async_add_listener(self._access_updated))
+
+    @callback
+    def _access_updated(self) -> None:
         async_write_if_visible_changed(self, self.native_value)
