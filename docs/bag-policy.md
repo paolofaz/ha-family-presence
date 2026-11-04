@@ -1,52 +1,84 @@
-# Backpack schedule — event-based behavior (Alpha 5)
+# Zaino — comportamento condizionato all'uscita (RC6)
 
-This replaces the earlier two backpack priority modes. No permanent bag-off
-guard, no school-only policy switch, no eight-hour manual hold.
+La FSM registra eventi reali dallo zaino BLE, senza dedurre movimenti
+dalla sola presenza persistente del sensore. Il motore non accende o spegne
+l'allarme direttamente: le automazioni esterne possono però usare lo stato HOME.
 
-## Single rule
+## Uscita
 
-- **ON→OFF**: if enabled and this event timestamp falls inside the configured
-  local time window *and* selected weekday, set **away**, even if phone/Watch
-  evidence disagreed immediately before this event.
-- **OFF→ON**: if enabled, set **home** at any time, independent of the configured
-  departure schedule.
-- **OFF steady**: does **not** veto later phone/Watch/door events. A later
-  valid event can set home or away using the normal FSM.
-- **Disabled**: both bag transitions are ignored by Family Presence.
-- **unknown/unavailable→on/off**: not a real bag transition, so no automatic
-  home/away. A reboot finding the bag already OFF does not synthesize departure.
+Uno zaino che passa **ON → OFF** imposta la persona su **AWAY** se:
 
-## Options
+- Lo zaino è abilitato.
+- L'evento avviene nel giorno e nella fascia configurati (ora locale HA).
+- La persona **non è già AWAY**: un'uscita dello zaino non deve sovrascrivere
+  un'assenza precedentemente confermata da iPhone o Watch.
 
-Per-person schedule has `enabled`, `start`, `end`, `days`.
-Dates are evaluated in the Home Assistant timezone at the **HA event time**,
-not when the asynchronous queue happens to process the event.
+Se lo zaino provoca davvero AWAY, la FSM registra per quella persona un
+indicatore causale `bag_return_eligible = true`. Non è un blocco manuale:
+un successivo evento valido di iPhone, Watch o una correzione manuale può
+aggiornare normalmente lo stato e togliere il diritto di rientro allo zaino.
 
-- 07:00–09:10, Mon–Fri: school window.
-- 00:00–00:00, all days: always enabled for departure.
-- 22:00–02:00, Monday: Monday evening through Tuesday 01:59.
-- Enabled = false: disable the bag entirely.
+## Rientro
 
-The independent BLE source applies its own 180s absence timeout; this FSM
-responds when its binary sensor actually transitions to OFF. We must still
-evaluate false OFFs and the blind period before the provider publishes OFF.
+Il passaggio **OFF → ON** può impostare **HOME**, a qualsiasi ora, soltanto
+se lo zaino è abilitato, il passaggio è fisicamente valido e:
 
-## Manual correction
+1. La persona è `AWAY` oppure `NEAR_HOME`.
+2. L'uscita che ha determinato l'assenza è stata un `BAG_LEFT` valido.
+3. Nessun successivo evento autorevole ha sostituito la causa dell'assenza.
 
-Two buttons per person set a one-off `home` or `away` decision. They do not
-lock the state or change the backpack's schedule. After an explicit button
-press, the next **new** Watch, phone or bag event can change the state.
+La FSM non confronta testi tradotti come `"Zaino uscito"`, ma un
+flag di provenienza aggiornato dagli eventi. Un nuovo iPhone AWAY quando
+lo stato era già AWAY revoca comunque il diritto dello zaino di marcare HOME.
 
-## Migration
+**Caso NEAR_HOME:** se il Watch è stato rilevato e ha portato la persona da
+AWAY (zaino) a NEAR_HOME senza confermare il rientro, la successiva rilevazione
+dello zaino può confermare HOME. Se invece il Watch si perde nuovamente,
+la FSM torna AWAY e revoca quel diritto.
 
-Previously configured `always` maps to a 24h/all-days schedule,
-`legacy` maps to weekday 07:00–09:10. These values remain internal solely
-for reading existing Alpha snapshots/configuration; they are no longer
-user-facing options or FSM precedence modes.
+**Forzatura manuale AWAY:** non autorizza il rientro dello zaino. Una
+correzione manuale non può essere annullata da una semplice riconnessione BLE
+dello zaino. Un successivo iPhone HOME o Watch con evidenze fisiche valide
+può invece marcare HOME.
 
-## Critical alarm safety note
+**HOME già confermato:** un altro evento ON dello zaino viene ignorato,
+senza riscrivere motivo e data dell'ultimo cambio di presenza.
 
-This is shadow-only. A future production force-away button could contribute
-to a claim that the house is empty. Until all-away confidence and automation
-behavior are validated, do not use these buttons or diagnostic sensors to
-arm or disarm any alarm.
+## Riavvii e aggiornamento da RC5
+
+Il flag viene salvato nella snapshot della FSM assieme allo stato, usando
+un campo opzionale del formato 5. Dopo un riavvio RC6, una partenza causata
+dallo zaino conserva il diritto di rientro anche da NEAR_HOME.
+
+Le snapshot RC5 non contengono il flag. Per prudenza, dopo il **primo**
+aggiornamento, una persona già AWAY per lo zaino non viene automaticamente
+riportata a HOME dal solo zaino ON: per quella situazione eccezionale serve
+un normale evento di iPhone/Watch o un intervento manuale. Dopo una nuova
+uscita reale dello zaino, il ciclo torna completamente automatico.
+
+Un recupero `unavailable → on` o `unknown → on` non è un vero OFF → ON:
+l'adapter continua a ignorarlo. Lo zaino OFF permanente non impedisce agli
+altri sensori di determinare un rientro.
+
+## Configurazione e orari
+
+Ogni persona ha `enabled`, `start`, `end`, `days`:
+
+- 07:00–09:10, lun–ven: finestra scolastica predefinita.
+- 00:00–00:00, tutti i giorni: uscita consentita 24h.
+- 22:00–02:00 il lunedì: comprende il martedì fino alle 01:59.
+- `enabled = false`: ignora sia ON → OFF che OFF → ON.
+
+I timeout di assenza BLE sono configurati nel sensore sorgente, non
+nell'integrazione Family Presence.
+
+I vecchi codici `always` e `legacy` restano solo compatibilità interna:
+non ci sono due modalità di precedenza della presenza.
+
+## Collaudo consigliato
+
+Verificare almeno un'uscita vera nella fascia configurata e il successivo
+rientro, una disconnessione BLE dello zaino mentre iPhone segnala AWAY,
+il percorso AWAY → NEAR_HOME → HOME e il riavvio di HA dopo BAG_LEFT.
+L'attributo `bag_return_eligible` del sensore individuale mostra il valore
+attuale della condizione.

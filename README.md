@@ -5,12 +5,12 @@ Sources: phone tracker, Watch BLE, optional bag BLE sensor and shared
 gate/door/lock/alarm evidence. The original private family YAML is **not**
 included in this repository.
 
-> **Latest: v0.1.0rc5.** HACS uses the `family_presence.zip` release asset and
+> **Latest: v0.1.0rc6.** HACS uses the `family_presence.zip` release asset and
 > the repository-root `manifest.json` to identify the integration before installing.
 > The same manifest is also shipped in `custom_components/family_presence/`.
 > **Do not disable existing YAML alarm or presence automations before a supervised cutover.**
 > The integration itself never actuates alarm, door locks or heating.
-> See [RC5 release notes](docs/rc5-release-it.md) and [RC2/RC5 migration](docs/rc2-migrazione-it.md).
+> See [RC6 release notes](docs/rc6-release-it.md) and [RC2/RC6 migration](docs/rc2-migrazione-it.md).
 
 ## What the FSM computes
 
@@ -34,7 +34,12 @@ with a bag can configure **enabled**, **start time**, **end time**, and
 - A genuine bag **ON→OFF**, within the configured departure window, sets AWAY.
   This is a transition event, **not a persistent veto**: a later valid phone or
   Watch/entrance event can change the state.
-- Bag **OFF→ON** sets HOME at any hour, provided the bag is enabled.
+- Bag **OFF→ON** sets HOME at any hour **only when this same bag previously
+  established AWAY via an accepted ON→OFF event**. A Watch transition from
+  that AWAY to provisional NEAR_HOME keeps the bag's return eligibility.
+  iPhone/Watch departures and manual AWAY are not undone by a bag reconnect.
+  This eligibility persists across restarts in new snapshots; RC5 snapshots
+  without the field default safely to no bag-return authority.
 - Disabled bag means **neither transition affects the FSM**.
 - Start = end (e.g. **00:00–00:00**) means 24 hours on the selected weekdays.
   Overnight windows such as 22:00–02:00 are supported, including the next day.
@@ -201,7 +206,8 @@ output. A manual **Forza fuori casa** may eventually contribute to arming when
 real outputs exist; that workflow requires separate approval and testing.
 
 See [Architecture](docs/architecture.md), [Backpack transitions](docs/bag-policy.md),
-[Alpha 6 field test](docs/alpha6-reliability.md),\n[Alpha 7 history](docs/alpha7-household-safety.md),
+[Alpha 6 field test](docs/alpha6-reliability.md),
+[Alpha 7 history](docs/alpha7-household-safety.md),
 [Alpha 8 authoritative aggregate](docs/alpha8-aggregate.md),
 [Alpha 9 parity diagnostics](docs/alpha9-legacy-parity.md),
 [Beta 1 complete field test](docs/beta1-field-test.md),

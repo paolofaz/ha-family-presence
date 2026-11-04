@@ -29,8 +29,12 @@ becomes provisional NEAR_HOME; Watch OFF uses prior evidence relative to
 `last_seen_before_off` or the phone/alarm. Shared condominium gate events
 cannot identify a person on their own.
 
-A configured bag provides two **events**: OFF→ON HOME at any time; ON→OFF AWAY
-only in its enabled and configured local time/day window. Bag OFF **is not
+A configured bag provides two **events**: ON→OFF may establish AWAY only
+inside its configured local time/day window; OFF→ON may establish HOME at any
+time only when an earlier accepted BAG_LEFT caused AWAY. The coordinator stores
+a per-person `bag_return_eligible` provenance flag (not a reason string).
+It remains valid through Watch-caused NEAR_HOME, but clears when a new iPhone,
+Watch or manual event supersedes the bag departure. Bag OFF **is not
 a permanent veto**. The next valid sensor event may update the state.
 
 Two buttons per person, Forza a casa / Forza fuori casa, generate immediate
@@ -69,6 +73,9 @@ read-only parity checking in Beta 1; it is never used for FSM decisions.
 ## Restart and confidence
 
 Snapshot **format 5** fingerprints source mappings (iPhone/Watch/bag) alone.
+RC6 adds an optional boolean `bag_return_eligible` to that same format, which
+new snapshots persist. Earlier snapshots without it fail closed, leaving the
+previous presence state intact until an independent event or a new bag trip.
 Departure schedule edits no longer erase the saved shadow state. It also stores
 state, reason, transition time, last manual action and last ignored event.
 Old formats 1–4 can be read when their original fingerprints still match.
