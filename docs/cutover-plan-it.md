@@ -111,3 +111,15 @@ Verificare che non nasca un `_2` e che il rollback sia riproducibile.
 La Beta 1 e l'attuale sviluppo RC1 **non attivano** questi interventi.
 Sono soltanto codice preparatorio, test e checklist. Il passaggio reale
 richiederà una sessione di cutover esplicita e verificata.
+
+## RC1: implementazione del selettore profilo (solo codice, nessun cutover)
+
+Il branch dispone di un'opzione persistente `output_profile` con default
+`shadow`, di un preflight del registro (unique_id stabili, entity_id reali,
+nessun output disabilitato) e del comando testuale `ATTIVA` / `OMBRA`.
+L'integrazione non cambia YAML, automazioni né `entity_id`, e il rollback
+del solo profilo **non è un rollback operativo completo**: bisogna prima
+ripristinare i consumer YAML. Nessuna attivazione deve essere fatta fino
+alla pubblicazione RC1 e al completamento dei collaudi.
+Seguire [runbook operativo](rc1-operational-runbook-it.md) e
+[traccia YAML generica](rc1-yaml-consumers.example.yaml).

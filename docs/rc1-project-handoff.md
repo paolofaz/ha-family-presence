@@ -74,3 +74,21 @@ della presenza e `_2` nel registro entità per Casa certamente vuota.
 **Per una nuova chat del progetto:** aprire subito questo documento,
 leggere PR #12 e lo stato del branch prima di cambiare codice. Non
 dedurre che una PR draft sia una release RC installabile.
+
+## Aggiornamento sviluppo RC1 (nuova sessione, 4 novembre 2026)
+
+Il branch ha ora il modulo `operational.py` per controllare la presenza
+nel registro HA degli output di ogni membro e dell'aggregato, e
+`output_profile` con default Shadow. Configura offre conferme testuali
+ATTIVA/OMBRA; gli output di persona/aggregato/pulsanti mantengono gli
+unique_id e usano metadati Final solo se espressamente attivati.
+Il ritorno a Shadow non scollega i consumer YAML: il runbook descrive il
+rollback *completo*, che include la riconnessione ai vecchi helper.
+Le modifiche a persone, sorgenti e fasce vengono bloccate mentre Final è
+attivo. Non vengono introdotti comandi diretti all'allarme.
+
+**Stato operativo invariato:** Beta 1 su HA, YAML legacy attivo; RC1 su
+branch development-only. Nessuna installazione/cutover/merge/tag.
+La pubblicazione come prerelease richiede conferma del CI aggiornato e
+completamento del collaudo sul campo. Vedere
+`docs/rc1-operational-runbook-it.md`.

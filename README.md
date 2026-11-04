@@ -122,10 +122,10 @@ unchanged. All integration outputs remain **shadow**. Use the
 [Italian Beta 1 field test](docs/beta1-field-test.md) for every family member
 before attempting any final cutover.
 
-### RC1 preparation — stable entity IDs, no cutover yet
+### RC1 opt-in output profile — code under development, no cutover yet
 
 The RC1 branch prepares future definitive names in `presentation.py`
-without changing **any existing entity unique ID**. Currently all
+without changing **any existing entity unique ID**. With no explicit activation all
 entities keep their Beta 1 Shadow labels and diagnostic categories.
 Changing display names alone does not necessarily change the entity IDs
 Home Assistant has already stored. The YAML cutover must review the
@@ -137,6 +137,14 @@ disarming and unlocked-door warnings as **pure testable functions**;
 it is never invoked as a Home Assistant service call.
 The physical-event YAML automation `presenza_evento_fisico` is
 also a state writer and must be deactivated or split in the final cutover.
+
+The RC1 code now provides a guarded Configure → Activation options step:
+registry-backed output preflight and typed ATTIVA/OMBRA confirmations.
+It changes the output presentation/metadata only; it never rewires YAML,
+claims entity IDs or performs actuator calls. It starts in Shadow and is
+**not** an approved production migration. See
+[operational runbook](docs/rc1-operational-runbook-it.md) and
+[generic YAML consumer example](docs/rc1-yaml-consumers.example.yaml).
 
 The migration is not yet active; the legacy YAML continues all real actions.
 See [RC1 cutover checklist](docs/cutover-plan-it.md),
