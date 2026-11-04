@@ -12,6 +12,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .fsm import State
+from .presentation import force_presentation
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,12 +41,9 @@ class ShadowForceButton(ButtonEntity):
         self.person = person
         self.target = target
         name = self.engine.people[person].name
-        self._attr_unique_id = f"{entry_id}_{person}_shadow_force_{target.value}"
-        self._attr_name = (
-            f"Family Presence Shadow {name} — Forza a casa"
-            if target == State.HOME
-            else f"Family Presence Shadow {name} — Forza fuori casa"
-        )
+        presentation = force_presentation(entry_id, person, name, target.value)
+        self._attr_unique_id = presentation.unique_id
+        self._attr_name = presentation.name
         self._attr_icon = "mdi:home-import-outline" if target == State.HOME else "mdi:home-export-outline"
 
     async def async_press(self) -> None:
