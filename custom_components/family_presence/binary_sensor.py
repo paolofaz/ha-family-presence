@@ -11,6 +11,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import ShadowCoordinator
 from .devices import household_device_info
+from .visible_updates import capture_visible_state, async_write_if_visible_changed
 from .presentation import SHADOW, FINAL, aggregate_presentation
 
 
@@ -44,6 +45,7 @@ class ShadowAllAwayBinarySensor(BinarySensorEntity):
         self._attr_has_entity_name = False
         self._attr_device_info = household_device_info(entry_id)
         self._attr_entity_category = EntityCategory.DIAGNOSTIC if presentation.diagnostic else None
+        self._last_visible_state = capture_visible_state(self, self.is_on)
 
     @property
     def is_on(self) -> bool:
@@ -51,6 +53,9 @@ class ShadowAllAwayBinarySensor(BinarySensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict:
+        if self.profile == FINAL:
+            # Alarm-facing aggregate: publish only the boolean state.
+            return {}
         assessment = self.engine.household_assessment()
         comparison = self.engine.legacy_comparison()
         data = {
@@ -117,8 +122,9 @@ class ShadowAllAwayBinarySensor(BinarySensorEntity):
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
+        self._last_visible_state = capture_visible_state(self, self.is_on)
         self.async_on_remove(self.engine.async_add_listener(self._updated))
 
     @callback
     def _updated(self, _person: str) -> None:
-        self.async_write_ha_state()
+        async_write_if_visible_changed(self, self.is_on)
