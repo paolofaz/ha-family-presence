@@ -59,6 +59,35 @@ class RC5EntityGroupingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(all_away._attr_name, "Casa certamente vuota")
         self.assertEqual(home_button._attr_name, "Paolo — Forza a casa")
 
+    async def test_four_members_have_distinct_presence_ids_but_one_device(self):
+        sensor = load_sensor_module()
+        people = [
+            PersonSources(key, name, iphone=f"device_tracker.{key}")
+            for key, name in (
+                ("paolo", "Paolo"),
+                ("cristina", "Cristina"),
+                ("giulia", "Giulia"),
+                ("arianna", "Arianna"),
+            )
+        ]
+        engine = ShadowCoordinator(people, read_state=lambda _id: None)
+        entities = [
+            sensor.ShadowPersonSensor("entry", engine, key, FINAL)
+            for key in engine.people
+        ]
+        self.assertEqual(
+            [entity._attr_name for entity in entities],
+            ["Presenza Paolo", "Presenza Cristina",
+             "Presenza Giulia", "Presenza Arianna"],
+        )
+        self.assertEqual(len({entity._attr_unique_id for entity in entities}), 4)
+        self.assertEqual(
+            len({next(iter(entity._attr_device_info["identifiers"]))
+                 for entity in entities}),
+            1,
+        )
+        self.assertEqual(entities[0]._attr_device_info["name"], "Casa")
+
     async def test_final_state_attributes_do_not_expose_yaml_comparison(self):
         sensor = load_sensor_module()
         binary = load_binary_sensor_module()
