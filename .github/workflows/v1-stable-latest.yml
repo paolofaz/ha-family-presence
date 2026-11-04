@@ -86,9 +86,9 @@ jobs:
               assert "manifest.json" in paths
               assert "__init__.py" in paths
               assert "config_flow.py" in paths
-          assert "diagnostics.py" in paths
-          assert "diagnostic_data.py" in paths
-          assert "access_history.py" in paths
+              assert "diagnostics.py" in paths
+              assert "diagnostic_data.py" in paths
+              assert "access_history.py" in paths
               assert "family_presence/manifest.json" not in paths
               assert json.loads(archive.read("manifest.json"))["version"] == "1.0.0"
               assert json.loads(archive.read("manifest.json")) == json.loads(Path("manifest.json").read_text())
