@@ -45,7 +45,10 @@ class ItalianLabelsTests(unittest.TestCase):
 
         ]
         for current, event, evidence in cases:
-            decision = decide(current, event, evidence)
+            decision = decide(
+                current, event, evidence,
+                bag_return_eligible=(event == Event.BAG_ARRIVED),
+            )
             self.assertIsNotNone(decision, msg=str((current, event)))
             translated = reason_label(decision.reason)
             with self.subTest(event=event, original=decision.reason):
