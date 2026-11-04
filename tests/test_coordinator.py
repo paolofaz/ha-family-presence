@@ -70,11 +70,21 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(c.state("child"), State.AWAY)
         result = await c.process("child", Event.IPHONE_ARRIVED, event_time=self.now)
         self.assertEqual(result.current, State.HOME)
-    async def test_bag_arrived_goes_home_but_presence_does_not_stay_locked(self):
+    async def test_bag_arrived_goes_home_only_after_bag_departure(self):
+        self.inputs["ref"] = "home"
         c = self.engine()
+        self.assertEqual(
+            (await c.process("child", Event.BAG_LEFT, event_time=self.now)).current,
+            State.AWAY,
+        )
+        self.assertTrue(c.runtime["child"].bag_return_eligible)
+        self.now += timedelta(seconds=1)
         self.inputs["bag"] = "on"
         d = await c.process("child", Event.BAG_ARRIVED, event_time=self.now)
         self.assertEqual((d.current, d.reason), (State.HOME, "Bag arrived"))
+        self.assertFalse(c.runtime["child"].bag_return_eligible)
+        self.now += timedelta(seconds=1)
+        self.inputs["phone"] = "not_home"
         d = await c.process("child", Event.IPHONE_LEFT, event_time=self.now)
         self.assertEqual(d.current, State.AWAY)
 

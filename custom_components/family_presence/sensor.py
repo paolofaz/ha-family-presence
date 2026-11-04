@@ -77,6 +77,7 @@ class ShadowPersonSensor(SensorEntity):
                 if rt.manual_last_action_at else None
             ),
             "bag_state": bag,
+            "bag_return_eligible": rt.bag_return_eligible if p.bag else None,
             "bag_enabled": p.bag_schedule.enabled if p.bag else None,
             "bag_window_start": p.bag_schedule.start if p.bag else None,
             "bag_window_end": p.bag_schedule.end if p.bag else None,

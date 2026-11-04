@@ -39,11 +39,20 @@ class TestPresenceFSM(unittest.TestCase):
         self.assertIsNone(decide(State.HOME, Event.BAG_LEFT,
                                  Evidence(bag_departure_active=True, bag_enabled=False)))
 
-    def test_bag_return_is_unconditional_when_enabled(self):
-        self.assertEqual(decide(State.AWAY, Event.BAG_ARRIVED,
-                                Evidence(bag_departure_active=False)).state, State.HOME)
+    def test_bag_return_requires_prior_bag_departure_and_away_or_near_home(self):
+        self.assertIsNone(decide(State.AWAY, Event.BAG_ARRIVED))
+        self.assertIsNone(decide(State.NEAR_HOME, Event.BAG_ARRIVED))
+        self.assertIsNone(decide(State.HOME, Event.BAG_ARRIVED,
+                                 bag_return_eligible=True))
         self.assertIsNone(decide(State.AWAY, Event.BAG_ARRIVED,
-                                 Evidence(bag_enabled=False)))
+                                 Evidence(bag_enabled=False), bag_return_eligible=True))
+        for state in (State.AWAY, State.NEAR_HOME):
+            self.assertEqual(decide(state, Event.BAG_ARRIVED,
+                                    bag_return_eligible=True).state, State.HOME)
+
+    def test_bag_departure_does_not_replace_other_away_reason(self):
+        self.assertIsNone(decide(State.AWAY, Event.BAG_LEFT,
+                                 Evidence(bag_departure_active=True)))
 
     def test_absent_bag_does_not_veto_future_phone_or_watch(self):
         e = Evidence(bag_status=BagStatus.ABSENT, gate_entry=True)

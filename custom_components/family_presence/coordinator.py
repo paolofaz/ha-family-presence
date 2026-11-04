@@ -76,6 +76,9 @@ class PersonRuntime:
     # The legacy YAML reference is never used to seed or reconcile runtime.
     state_origin: str = "unknown"
     reason_origin: str = "not_recorded"
+    # True only after a BAG_LEFT that actually caused AWAY. This trip can
+    # survive Watch -> NEAR_HOME and a validated snapshot, but no other exit.
+    bag_return_eligible: bool = False
     # Manual forcing is a single event, not a hold or priority override.
     manual_last_action: str | None = None
     manual_last_action_at: datetime | None = None
@@ -301,6 +304,9 @@ class ShadowCoordinator:
                     "fingerprint": self._source_fingerprint(self.people[key]),
                     "state": rt.state.value if rt.state is not None else None,
                     "reason": rt.last_reason,
+                    # Additive format-5 field: earlier RC5 snapshots default
+                    # safely to False instead of trusting human-readable reasons.
+                    "bag_return_eligible": rt.bag_return_eligible,
                     "last_changed": (
                         rt.last_changed.isoformat() if rt.last_changed else None
                     ),
@@ -357,6 +363,12 @@ class ShadowCoordinator:
             rt.state = saved_state
             rt.state_origin = "saved_shadow_unverified"
             rt.restored_from_storage = True
+            rt.bag_return_eligible = (
+                data["format"] == 5
+                and record.get("bag_return_eligible") is True
+                and saved_state in (State.AWAY, State.NEAR_HOME)
+                and bool(self.people[key].bag)
+            )
 
             reason = record.get("reason")
             if isinstance(reason, str) and reason.strip():
@@ -555,13 +567,23 @@ class ShadowCoordinator:
 
             if event not in (Event.RECONCILE, Event.MANUAL_HOME, Event.MANUAL_AWAY):
                 rt.last_source_event_at = at
-            result: Decision | None = decide(rt.state, event, evidence)
+            result: Decision | None = decide(
+                rt.state, event, evidence,
+                bag_return_eligible=rt.bag_return_eligible,
+            )
 
             # A real newer phone event can corroborate a manually forced or
             # restored value even when the FSM is already in that same state.
             # This affects provenance/confidence only; it does not manufacture
             # a new transition or change the per-person state.
             unverified = rt.restored_from_storage or rt.state_origin == "manual_force"
+            # A fresh iPhone departure is more specific than the earlier bag
+            # departure even if the state was already AWAY. Revoke the bag
+            # right to return HOME and update the reason without a state flip.
+            if (result is None and event == Event.IPHONE_LEFT
+                    and rt.state == State.AWAY and rt.bag_return_eligible
+                    and evidence.iphone_outside):
+                result = Decision(State.AWAY, "iPhone left home zone")
             if result is None and unverified and config.iphone:
                 if (event == Event.IPHONE_LEFT and rt.state == State.AWAY
                         and evidence.iphone_outside):
@@ -576,6 +598,12 @@ class ShadowCoordinator:
                     reason = "Zaino disabilitato nella configurazione"
                 elif event == Event.BAG_LEFT and not evidence.bag_departure_active:
                     reason = "Uscita zaino fuori dalla fascia oraria configurata"
+                elif event == Event.BAG_LEFT and rt.state == State.AWAY:
+                    reason = "Zaino uscito ma persona già fuori: causa di uscita invariata"
+                elif event == Event.BAG_ARRIVED and rt.state == State.HOME:
+                    reason = "Zaino rilevato, persona già in casa"
+                elif event == Event.BAG_ARRIVED:
+                    reason = "Zaino rilevato, ma non risulta una uscita causata dallo zaino"
                 elif event == Event.WATCH_LOST:
                     reason = "Watch non rilevato, ma mancano condizioni di uscita valide"
                 elif event == Event.WATCH_SEEN:
@@ -588,6 +616,15 @@ class ShadowCoordinator:
                 return None
             previous = rt.state
             rt.state = result.state
+            if event == Event.BAG_LEFT:
+                # Only a departure which actually establishes AWAY grants
+                # this bag the right to confirm the next arrival.
+                rt.bag_return_eligible = previous != State.AWAY
+            elif not (event == Event.WATCH_SEEN and previous == State.AWAY
+                      and result.state == State.NEAR_HOME):
+                # Watch proximity is provisional; retain the known bag trip.
+                # Other applied events, including manual AWAY, supersede it.
+                rt.bag_return_eligible = False
             self._refresh_comparison(person)
             rt.last_reason = result.reason
             rt.restored_from_storage = False

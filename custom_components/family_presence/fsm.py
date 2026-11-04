@@ -74,11 +74,14 @@ def decide(
     evidence: Evidence = Evidence(),
     *,
     bag_policy: BagPolicy = BagPolicy.ALWAYS,  # Migration-only compatibility; ignored
+    bag_return_eligible: bool = False,
 ) -> Decision | None:
-    """An ON→OFF bag transition has priority only when it occurs in-window.
+    """Gate a backpack arrival on a verified backpack-caused absence.
 
-    No permanent bag-OFF veto exists. The next valid event from any source
-    may update the person. Manual buttons are one-off state-setting events.
+    The coordinator tracks causal provenance independently of reason strings.
+    WATCH_SEEN may move an eligible AWAY to NEAR_HOME without discarding the
+    backpack trip; unrelated and manual departures cannot be resolved by bag ON.
+    All non-bag sensor events remain valid even if the backpack is absent.
     """
     if event == Event.MANUAL_HOME:
         return Decision(State.HOME, "Forzato in casa manualmente")
@@ -125,10 +128,12 @@ def decide(
             return Decision(State.HOME, "Watch detected + " + evidence.physical_event_label)
         return None
 
-    # Existing YAML updates reason even if already in the resulting state.
-    if event == Event.BAG_ARRIVED and evidence.bag_enabled:
+    if (event == Event.BAG_ARRIVED and evidence.bag_enabled
+            and bag_return_eligible and current in (State.AWAY, State.NEAR_HOME)):
         return Decision(State.HOME, "Bag arrived")
-    if event == Event.BAG_LEFT and evidence.bag_enabled and evidence.bag_departure_active:
+    # BAG_LEFT never steals the departure reason from an already-AWAY person.
+    if (event == Event.BAG_LEFT and evidence.bag_enabled
+            and evidence.bag_departure_active and current != State.AWAY):
         return Decision(State.AWAY, "Bag left")
     return None
 
