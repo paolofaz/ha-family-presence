@@ -1,4 +1,4 @@
-"""One-shot shadow controls to force a person HOME or AWAY.
+"""One-shot manual controls to force an individual person HOME or AWAY.
 
 No permanent precedence, no alarm/lock/HVAC services and no YAML writes.
 """
@@ -52,7 +52,7 @@ class ShadowForceButton(ButtonEntity):
         self._attr_icon = "mdi:home-import-outline" if target == State.HOME else "mdi:home-export-outline"
 
     async def async_press(self) -> None:
-        """Force current shadow state, persist instantly, keep normal FSM active."""
+        """Force current FSM state, persist instantly, keep normal FSM active."""
         decision = await self.engine.force_state(self.person, self.target)
         await self.runtime.store.async_save(self.engine.snapshot())
         _LOGGER.warning(

@@ -15,9 +15,9 @@ class ManifestTests(unittest.TestCase):
         self.assertTrue(manifest["config_flow"])
         self.assertTrue(manifest["single_config_entry"])
 
-    def test_release_manifest_version_matches_rc_8(self):
+    def test_release_manifest_version_matches_v1(self):
         manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["version"], "0.1.0rc8")
+        self.assertEqual(manifest["version"], "1.0.0")
 
 
 if __name__ == "__main__":

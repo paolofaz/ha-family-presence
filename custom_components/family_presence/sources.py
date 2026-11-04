@@ -1,4 +1,4 @@
-"""Home Assistant read-only source adapter for the shadow FSM.
+"""Home Assistant read-only source adapter for the production presence FSM.
 
 Never writes helper entities or invokes alarm/lock/heating services.
 """
@@ -104,25 +104,25 @@ def build_coordinator(hass: HomeAssistant, entry: Any) -> ShadowCoordinator:
 
     def report(d: ShadowDecision) -> None:
         _LOGGER.info(
-            "[shadow] %s: %s -> %s via %s (%s); baseline=%s",
+            "[family_presence] %s: %s -> %s via %s (%s); baseline=%s",
             d.person, d.previous, d.current, d.event.value,
             reason_label(d.reason), d.reference,
         )
         if d.near_home_duration_seconds is not None:
             _LOGGER.info(
-                "[shadow][near_home] %s: resolved after %.1f seconds -> %s",
+                "[family_presence][near_home] %s: resolved after %.1f seconds -> %s",
                 d.person, d.near_home_duration_seconds, d.current.value,
             )
 
     def report_block(block: ShadowBlocked) -> None:
         _LOGGER.info(
-            "[shadow][blocked] %s: ignored %s because bag is absent; baseline=%s",
+            "[family_presence][blocked] %s: ignored %s because bag is absent; baseline=%s",
             block.person, block.event.value, block.reference,
         )
 
     def report_ignore(ignored: ShadowIgnored) -> None:
         _LOGGER.info(
-            "[shadow][ignored] %s: %s (%s); baseline=%s",
+            "[family_presence][ignored] %s: %s (%s); baseline=%s",
             ignored.person, ignored.event.value, ignored.reason, ignored.reference,
         )
 
@@ -172,19 +172,19 @@ class ShadowSourceAdapter:
         if entities:
             self._unsub = async_track_state_change_event(self._hass, sorted(entities), self._changed)
         _LOGGER.info(
-            "Family Presence SHADOW active for %d people; no HA states or devices controlled",
+            "Family Presence active for %d people; no HA states or devices controlled",
             len(self.engine.people),
         )
 
     def _schedule(self, coro: Any) -> None:
-        task = self._hass.async_create_task(coro, name="family_presence_shadow")
+        task = self._hass.async_create_task(coro, name="family_presence_event")
         self._tasks.add(task)
         task.add_done_callback(self._task_done)
 
     def _task_done(self, task: asyncio.Task) -> None:
         self._tasks.discard(task)
         if not task.cancelled() and (error := task.exception()) is not None:
-            _LOGGER.error("Family Presence shadow processing failed", exc_info=error)
+            _LOGGER.error("Family Presence event processing failed", exc_info=error)
 
     @callback
     def _changed(self, event: HAEvent) -> None:

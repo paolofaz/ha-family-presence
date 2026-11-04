@@ -1,4 +1,4 @@
-"""Family Presence: independent FSM, optional controlled output profile.
+"""Family Presence: independent production FSM with stable entity identities.
 
 This integration does not modify external YAML or command HA actuators.
 """
@@ -35,7 +35,7 @@ class ShadowRuntime:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Restore shadow state, subscribe events, expose diagnostic-only sensors."""
+    """Restore persisted state and activate read-only presence output entities."""
     from homeassistant.helpers.storage import Store
     from .sources import ShadowSourceAdapter, build_coordinator
 
@@ -78,7 +78,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Remove diagnostic entities/listeners and preserve last shadow snapshot."""
+    """Remove all listeners and persist both FSM state and access history."""
     if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         return False
     runtime: ShadowRuntime = entry.runtime_data

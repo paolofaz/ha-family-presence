@@ -1,4 +1,4 @@
-"""Explicitly named read-only shadow diagnostics; NEVER use for alarm YAML."""
+"""Independent family presence sensors and opt-in diagnostic entities."""
 from __future__ import annotations
 
 from homeassistant.components.sensor import SensorEntity
@@ -17,7 +17,7 @@ from .presentation import FINAL, SHADOW, person_presentation, household_presenta
 async def async_setup_entry(
     hass: HomeAssistant, entry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
-    """Expose one diagnostically marked shadow sensor per configured person."""
+    """Register family member and household sensors under one Casa device."""
     engine = entry.runtime_data.engine
     profile = getattr(entry.runtime_data, "profile", SHADOW)
     entities = [
@@ -32,7 +32,7 @@ async def async_setup_entry(
 
 
 class ShadowPersonSensor(SensorEntity):
-    """Untrusted simulated state, intentionally separate from live YAML outputs."""
+    """Stable production FSM state; historical class name preserves compatibility."""
 
     _attr_should_poll = False
     _attr_entity_category = EntityCategory.DIAGNOSTIC

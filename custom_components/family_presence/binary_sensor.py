@@ -1,6 +1,6 @@
-"""Read-only shadow preview of the legacy 'Casa certamente vuota' aggregate.
+"""Read-only production all-away aggregate: ON iff every member is AWAY.
 
-Never connect this diagnostic binary sensor to production alarm automations.
+The integration does not actuate an alarm; external automations own any action.
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from .presentation import SHADOW, FINAL, aggregate_presentation
 async def async_setup_entry(
     hass: HomeAssistant, entry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
-    """Expose the precise on/off result of all configured shadow FSM states."""
+    """Expose the exact ON/OFF aggregate from the independent FSM."""
     async_add_entities([
         ShadowAllAwayBinarySensor(
             entry.entry_id, entry.runtime_data.engine,
