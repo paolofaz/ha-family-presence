@@ -17,7 +17,8 @@ per preparare la migrazione; non pubblicare il package su GitHub.
 ## Vecchio YAML: quali parti disattivare quando si farà il cutover
 
 Le seguenti automazioni sono writer/motore logico e andranno disabilitate
-insieme, dopo aver installato e verificato i nuovi output:
+insieme, dopo aver installato e verificato i nuovi output.
+**Anche `presenza_evento_fisico` è un writer**, come precisato sotto:
 
 - `presenza_uscita_watch`
 - `presenza_watch_rilevato`
@@ -25,13 +26,21 @@ insieme, dopo aver installato e verificato i nuovi output:
 - `presenza_uscita_iphone`
 - `presenza_rientro_iphone`
 - `presenza_zaini_figlie`
+- `presenza_evento_fisico` (oppure sostituita dalla sola registrazione eventi)
 
-Valutare anche `presenza_evento_fisico` e i timestamp vecchi: possono
-essere conservati come diagnostica, ma la FSM Python legge già
-direttamente gli eventi fisici. L'automazione
-`presenza_memorizza_ultimo_cambio` oggi ascolta i vecchi
-`sensor.presenza_*` e andrà sostituita o rimossa solo dopo la
-migrazione della dashboard.
+**ATTENZIONE: `presenza_evento_fisico` è anch'essa un writer.**
+Non si limita a memorizzare i timestamp: quando rileva porta/cancello/
+sblocco e un Watch compatibile, può scrivere `home` nei vecchi
+`input_select.presenza_*`. Non può quindi restare attiva integralmente
+insieme al nuovo motore. Nel cutover:
+- disabilitarla con gli altri writer;
+- eventualmente estrarne in una nuova automazione **solo** i timestamp
+  degli eventi fisici, senza alcuna chiamata a
+  `input_select.select_option` o `input_text.set_value`.
+
+Anche `presenza_memorizza_ultimo_cambio` oggi ascolta i vecchi
+`sensor.presenza_*`: va aggiornata o rimossa dopo la migrazione della
+dashboard. La FSM Python legge già direttamente gli eventi fisici.
 
 ## Vecchio YAML: azioni da mantenere e collegare agli output nuovi
 
@@ -55,10 +64,28 @@ possono essere mantenuti brevemente per rollback. Non vanno usati
 contemporaneamente per comandare allarme o presenza. Le dashboard che
 usano `sensor.presenza_*` richiederanno un aggiornamento ai nuovi stati.
 
+## Contratto delle automazioni YAML
+
+La RC1 contiene `activation_contract.py` con funzioni **pure, senza
+chiamate Home Assistant**, e test esaustivi delle condizioni:
+
+- Inserimento (`familyuscita`): casa vuota ON **e** serratura
+  `locked` **e** allarme `disarmed`.
+- Disinserimento (`familyrientro`): transizione effettiva
+  `away/near_home → home` **e** allarme `arming/armed_away`.
+- Avviso porta: casa vuota ON e serratura diversa da `locked`,
+  rivalutati dopo l'attesa prevista.
+
+L'allarme è e resta comandato da automazioni YAML **indipendenti**.
+Queste funzioni non sono connesse ad alcuna chiamata di servizio: servono
+per verificare la logica prima di sostituire i riferimenti.
+
 ## Rischio nomi/ID in Home Assistant
 
 Cambiare soltanto l'attributo `name` NON garantisce che Home Assistant
-cambi l'`entity_id` registrato. Prima del cutover identificare
+cambi l'`entity_id` registrato. Il modulo `presentation.py` prepara
+i nomi definitivi ma mantiene **gli stessi unique_id** già registrati
+nella Beta; nella RC1 la presentazione resta **Shadow**. Prima del cutover identificare
 `unique_id`, `entity_id` reali e dipendenze delle automazioni.
 Il sensore legacy `binary_sensor.casa_certamente_vuota` dovrà essere
 ritirato prima di assegnare lo stesso `entity_id` al nuovo sensore.
@@ -81,5 +108,6 @@ Verificare che non nasca un `_2` e che il rollback sia riproducibile.
    riferimenti e writer YAML, ricaricare, verificare
    `binary_sensor.casa_certamente_vuota` e stato allarme.
 
-L'Alpha 9/Beta 1 **non** attiva alcuno di questi interventi. Questo
-documento è solo una checklist di cutover da adattare dopo il test reale.
+La Beta 1 e l'attuale sviluppo RC1 **non attivano** questi interventi.
+Sono soltanto codice preparatorio, test e checklist. Il passaggio reale
+richiederà una sessione di cutover esplicita e verificata.
