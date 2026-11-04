@@ -161,6 +161,7 @@ class OptionsFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(set(form["schema"]), {
             "exit_gate_seconds", "exit_door_seconds", "exit_lock_seconds",
             "entry_gate_seconds", "entry_door_seconds", "entry_lock_seconds",
+            "near_home_entry_seconds",
         })
         result = await flow.async_step_windows({"exit_gate_seconds": 230})
         self.assertEqual(result["data"]["exit_gate_seconds"], 230)
