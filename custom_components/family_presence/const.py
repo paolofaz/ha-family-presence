@@ -30,6 +30,7 @@ DEFAULT_WINDOWS = {
     "entry_gate_seconds": 120,
     "entry_door_seconds": 120,
     "entry_lock_seconds": 120,
+    "near_home_entry_seconds": 180,
 }
 
 # RC1: absent option means Shadow; never force a production activation on upgrade.

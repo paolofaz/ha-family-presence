@@ -58,8 +58,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         lambda: access_store.async_delay_save(access_history.snapshot, 2)
     )
 
-    unsubscribe_save = engine.async_add_listener(
-        lambda _person: store.async_delay_save(engine.snapshot, 2)
+    unsubscribe_save = engine.async_add_persist_listener(
+        lambda: store.async_delay_save(engine.snapshot, 2)
     )
     adapter = ShadowSourceAdapter(hass, entry.data, engine, access_history)
     entry.runtime_data = ShadowRuntime(

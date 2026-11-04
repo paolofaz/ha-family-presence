@@ -167,15 +167,22 @@ class ShadowHouseholdSensor(SensorEntity):
     def extra_state_attributes(self) -> dict:
         assessment = self.engine.household_assessment()
         if self.profile == FINAL:
-            # Only source anomalies belong on the household diagnostic entity.
-            if not assessment.source_warnings:
-                return {}
-            return {
-                "source_warnings": {
+            # A restored presence is operationally authoritative for backward
+            # compatibility, but has not been verified by a fresh observation.
+            attrs = {}
+            if assessment.source_warnings:
+                attrs["source_warnings"] = {
                     self.engine.people[key].name: list(warnings)
                     for key, warnings in assessment.source_warnings.items()
                 }
-            }
+            unverified = [
+                self.engine.people[key].name
+                for key, rt in self.engine.runtime.items()
+                if rt.restored_from_storage
+            ]
+            if unverified:
+                attrs["restored_unverified_members"] = unverified
+            return attrs
         comparison = self.engine.legacy_comparison()
         data = {
             "mode": "shadow_only" if self.profile == SHADOW else "final",

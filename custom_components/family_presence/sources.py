@@ -94,6 +94,7 @@ def build_coordinator(hass: HomeAssistant, entry: Any) -> ShadowCoordinator:
         for key in (
             "exit_gate_seconds", "exit_door_seconds", "exit_lock_seconds",
             "entry_gate_seconds", "entry_door_seconds", "entry_lock_seconds",
+            "near_home_entry_seconds",
         )
     }
 

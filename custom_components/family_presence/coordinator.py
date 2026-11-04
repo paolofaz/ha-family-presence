@@ -21,6 +21,9 @@ class Windows:
     entry_door_seconds: int = 120
     entry_lock_seconds: int = 120
     watch_on_delay_seconds: float = 2.0
+    # Only a recent personal Watch near-home detection can be confirmed by
+    # a shared door/gate/lock event (which may belong to someone else).
+    near_home_entry_seconds: int = 180
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,6 +161,8 @@ class ShadowCoordinator:
         self.report_block = report_block
         self.report_ignore = report_ignore
         self._listeners: set[Callable[[str], None]] = set()
+        # Persistence deliberately ignores source-only and rejected events.
+        self._persist_listeners: set[Callable[[], None]] = set()
         # Since the current runtime started; this does not gate any FSM state.
         self.parity_status = "not_configured"
         self.parity_diverged_since: datetime | None = None
@@ -187,11 +192,19 @@ class ShadowCoordinator:
         self._listeners.add(listener)
         return lambda: self._listeners.discard(listener)
 
-    def _notify(self, person: str) -> None:
-        # Includes updates to mapped YAML references, not just FSM transitions.
+    def async_add_persist_listener(self, listener: Callable[[], None]) -> Callable[[], None]:
+        """Subscribe only to accepted FSM decisions requiring durable storage."""
+        self._persist_listeners.add(listener)
+        return lambda: self._persist_listeners.discard(listener)
+
+    def _notify(self, person: str, *, persist: bool = False) -> None:
+        """Notify public entities, separately requesting durable FSM storage."""
         self._refresh_parity_comparison()
         for listener in tuple(self._listeners):
             listener(person)
+        if persist:
+            for listener in tuple(self._persist_listeners):
+                listener()
 
     def notify_source_update(self, person: str) -> None:
         """Refresh comparison after a legacy/source entity has changed."""
@@ -566,6 +579,20 @@ class ShadowCoordinator:
                 self._record_ignored(person, event, at, "Zaino non più presente: evento obsoleto")
                 return None
 
+            if event == Event.PHYSICAL_ENTRY and rt.state == State.NEAR_HOME:
+                # A generic door/lock/gate transition is shared by all people.
+                # It must not resolve a stale Watch near-home observation, or a
+                # restored near-home state with unknown observation age.
+                seen = rt.near_home_entered_at
+                age = (at - seen).total_seconds() if seen is not None else None
+                if (age is None or age < 0
+                        or age > self.windows.near_home_entry_seconds):
+                    self._record_ignored(
+                        person, event, at,
+                        "Evento fisico senza rilevamento Watch recente e verificabile",
+                    )
+                    return None
+
             if event not in (Event.RECONCILE, Event.MANUAL_HOME, Event.MANUAL_AWAY):
                 rt.last_source_event_at = at
             result: Decision | None = decide(
@@ -663,7 +690,7 @@ class ShadowCoordinator:
                 del rt.decisions[:-100]
             if self.report:
                 self.report(decision)
-            self._notify(person)
+            self._notify(person, persist=True)
             return decision
 
     async def reconcile(self) -> list[ShadowDecision]:
