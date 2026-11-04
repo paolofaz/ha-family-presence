@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from .operational import profile_from_options
+from .access_history import AccessHistory
 
 
 if TYPE_CHECKING:
@@ -28,6 +29,9 @@ class ShadowRuntime:
     store: Store
     unsubscribe_save: object
     profile: str
+    access_history: AccessHistory
+    access_store: Store
+    unsubscribe_access_save: object
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -45,12 +49,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await store.async_save(engine.snapshot())
     await engine.reconcile()
 
+    # Dedicated Store: restored access timestamps exist for display only, never
+    # for the coordinator\u0027s fresh physical-event correlation windows.
+    access_store = Store(hass, 1, f"family_presence_access_events.{entry.entry_id}")
+    access_history = AccessHistory(entry.data)
+    access_history.restore_snapshot(await access_store.async_load())
+    unsubscribe_access_save = access_history.async_add_listener(
+        lambda: access_store.async_delay_save(access_history.snapshot, 2)
+    )
+
     unsubscribe_save = engine.async_add_listener(
         lambda _person: store.async_delay_save(engine.snapshot, 2)
     )
-    adapter = ShadowSourceAdapter(hass, entry.data, engine)
+    adapter = ShadowSourceAdapter(hass, entry.data, engine, access_history)
     entry.runtime_data = ShadowRuntime(
-        engine, adapter, store, unsubscribe_save, profile_from_options(entry.options)
+        engine, adapter, store, unsubscribe_save, profile_from_options(entry.options),
+        access_history, access_store, unsubscribe_access_save,
     )
     try:
         adapter.start()
@@ -58,6 +72,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception:
         await adapter.async_stop()
         unsubscribe_save()
+        unsubscribe_access_save()
         raise
     return True
 
@@ -69,5 +84,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     runtime: ShadowRuntime = entry.runtime_data
     await runtime.adapter.async_stop()
     runtime.unsubscribe_save()
+    runtime.unsubscribe_access_save()
     await runtime.store.async_save(runtime.engine.snapshot())
+    await runtime.access_store.async_save(runtime.access_history.snapshot())
     return True
