@@ -5,7 +5,7 @@ Sources: phone tracker, Watch BLE, optional bag BLE sensor and shared
 gate/door/lock/alarm evidence. The original private family YAML is **not**
 included in this repository.
 
-> **Beta 1 (0.1.0b1), shadow-only field-test.** Do not disable the existing
+> **RC1 development branch (0.1.0rc1): NOT RELEASED; shadow-only until approved.** Do not disable the existing
 > YAML presence, alarm, heating or notification automations. Diagnostic states
 > and manual buttons here do not write the original YAML helpers or operate
 > alarms, heating or locks.
@@ -121,6 +121,27 @@ The exact `all members away = on` rule, including manual overrides, is
 unchanged. All integration outputs remain **shadow**. Use the
 [Italian Beta 1 field test](docs/beta1-field-test.md) for every family member
 before attempting any final cutover.
+
+### RC1 preparation — stable entity IDs, no cutover yet
+
+The RC1 branch prepares future definitive names in `presentation.py`
+without changing **any existing entity unique ID**. Currently all
+entities keep their Beta 1 Shadow labels and diagnostic categories.
+Changing display names alone does not necessarily change the entity IDs
+Home Assistant has already stored. The YAML cutover must review the
+entity registry and retire the old `casa_certamente_vuota` entity before
+claiming that ID for a new one.
+
+`activation_contract.py` codifies the existing YAML rules for arming,
+disarming and unlocked-door warnings as **pure testable functions**;
+it is never invoked as a Home Assistant service call.
+The physical-event YAML automation `presenza_evento_fisico` is
+also a state writer and must be deactivated or split in the final cutover.
+
+The migration is not yet active; the legacy YAML continues all real actions.
+See [RC1 cutover checklist](docs/cutover-plan-it.md),
+[RC1 project handoff](docs/rc1-project-handoff.md) and
+[Italian dashboard time format](docs/rc1-dashboard-local-time.md).
 
 ### Manual state forcing: one-off, not a hold
 
