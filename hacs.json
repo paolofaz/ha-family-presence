@@ -3,5 +3,6 @@
   "render_readme": true,
   "zip_release": true,
   "filename": "family_presence.zip",
-  "hide_default_branch": true
+  "hide_default_branch": true,
+  "content_in_root": true
 }
