@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import ShadowCoordinator
+from .presentation import DEFAULT_PROFILE, FINAL, aggregate_presentation
 
 
 async def async_setup_entry(
@@ -30,8 +31,9 @@ class ShadowAllAwayBinarySensor(BinarySensorEntity):
 
     def __init__(self, entry_id: str, engine: ShadowCoordinator) -> None:
         self.engine = engine
-        self._attr_name = "Family Presence Shadow - Casa certamente vuota"
-        self._attr_unique_id = f"{entry_id}_all_away_shadow"
+        presentation = aggregate_presentation(entry_id)
+        self._attr_name = presentation.name
+        self._attr_unique_id = presentation.unique_id
 
     @property
     def is_on(self) -> bool:
@@ -46,6 +48,9 @@ class ShadowAllAwayBinarySensor(BinarySensorEntity):
             "do_not_use_for_automations": True,
             "not_the_legacy_casa_certamente_vuota": True,
             "aggregation_rule": "all_configured_members_away",
+            "output_profile": DEFAULT_PROFILE,
+            "planned_final_name": aggregate_presentation("_preview_", FINAL).name,
+            "cutover_active": False,
             "legacy_comparison_status": comparison.status,
             "legacy_expected_all_away": comparison.legacy_expected_all_away,
             "aggregate_matches_legacy": comparison.aggregate_matches_legacy,
