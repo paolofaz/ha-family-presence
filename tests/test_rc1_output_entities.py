@@ -27,8 +27,7 @@ class RC1OutputEntityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(shadow._attr_entity_category, "diagnostic")
         self.assertEqual(final._attr_name, "Casa certamente vuota")
         self.assertFalse(final.is_on)
-        self.assertFalse(final.extra_state_attributes["do_not_use_for_automations"])
-        self.assertTrue(final.extra_state_attributes["cutover_active"])
+        self.assertEqual(final.extra_state_attributes, {})
         await self.engine.force_state("paolo", State.AWAY)
         self.assertTrue(shadow.is_on)
         self.assertTrue(final.is_on)
@@ -46,8 +45,9 @@ class RC1OutputEntityTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(final.native_value)
         await self.engine.force_state("paolo", State.AWAY)
         self.assertEqual(final.native_value, "away")
-        self.assertEqual(final.extra_state_attributes["mode"], "final")
-        self.assertTrue(final.extra_state_attributes["cutover_active"])
+        self.assertEqual(
+            set(final.extra_state_attributes), {"reason", "last_transition"}
+        )
 
     async def test_manual_buttons_keep_id_and_only_write_fsm_snapshot(self):
         buttons = load_buttons()
