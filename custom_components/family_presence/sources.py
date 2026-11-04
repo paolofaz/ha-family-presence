@@ -23,6 +23,7 @@ from .coordinator import PersonSources, ShadowBlocked, ShadowCoordinator, Shadow
 from .fsm import BagPolicy, Event
 from .bag_schedule import BagSchedule, legacy_schedule
 from .labels import reason_label
+from .access_history import AccessHistory
 
 _LOGGER = logging.getLogger(__name__)
 _INVALID = frozenset(("unknown", "unavailable"))
@@ -140,9 +141,11 @@ def build_coordinator(hass: HomeAssistant, entry: Any) -> ShadowCoordinator:
 class ShadowSourceAdapter:
     """Validate HA source changes before they reach the pure coordinator."""
 
-    def __init__(self, hass: HomeAssistant, config: dict[str, Any], engine: ShadowCoordinator) -> None:
+    def __init__(self, hass: HomeAssistant, config: dict[str, Any], engine: ShadowCoordinator,
+                 access_history: AccessHistory | None = None) -> None:
         self._hass = hass
         self.engine = engine
+        self.access_history = access_history
         self._unsub: Any = None
         self._tasks: set[asyncio.Task] = set()
         self._person_inputs: dict[str, list[tuple[str, str]]] = {}
@@ -231,6 +234,8 @@ class ShadowSourceAdapter:
 
         if physical:
             self.engine.record_physical(physical, at)
+            if self.access_history is not None:
+                self.access_history.record(physical, entity_id, at)
             if physical in ("gate", "door_open", "unlock"):
                 for key, config in self.engine.people.items():
                     if config.watch:
