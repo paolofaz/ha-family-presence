@@ -4,25 +4,23 @@
     "step": {
       "user": {
         "title": "Abitazione",
-        "description": "Seleziona i sensori condivisi. La RC2 pubblica stati definitivi, ma l'allarme resta gestito dalle automazioni YAML.",
+        "description": "Seleziona le sorgenti comuni della casa. La FSM Python produce gli stati definitivi; le automazioni YAML continuano a gestire l'allarme.",
         "data": {
           "household_name": "Nome abitazione",
-          "gate_entities": "Sensori cancello (facoltativi)",
+          "gate_entities": "Eventi cancelli (switch, sensore binario oppure lock). Per lock si usa la transizione da bloccato a sbloccato; non è un sensore di apertura fisica.",
           "door_contact": "Contatto porta (facoltativo)",
           "door_lock": "Serratura (facoltativa)",
-          "alarm": "Allarme (facoltativo)",
-          "legacy_all_away_binary": "Casa certamente vuota YAML (solo confronto, facoltativo)"
+          "alarm": "Allarme (facoltativo)"
         }
       },
       "person": {
         "title": "Componente della famiglia",
-        "description": "Associa le sorgenti personali. La vecchia FSM è soltanto un riferimento per il confronto.",
+        "description": "Seleziona le sorgenti personali. Il confronto con la vecchia FSM non è più necessario.",
         "data": {
           "person_name": "Nome",
           "iphone_tracker": "Tracker telefono (facoltativo)",
           "watch_sensor": "Sensore BLE indossabile (facoltativo)",
-          "bag_sensor": "Sensore zaino (facoltativo)",
-          "legacy_presence_entity": "Stato FSM YAML precedente (facoltativo, SOLO confronto)"
+          "bag_sensor": "Sensore zaino (facoltativo)"
         }
       },
       "another": {
@@ -42,14 +40,13 @@
       },
       "reconfigure_shared": {
         "title": "Sensori condivisi dell'abitazione",
-        "description": "Modifica i sensori fisici, senza cambiare le persone né le automazioni YAML.",
+        "description": "Modifica le sorgenti comuni, incluse eventuali entità lock per i cancelli.",
         "data": {
           "household_name": "Nome abitazione",
-          "gate_entities": "Sensori cancello (facoltativi)",
+          "gate_entities": "Eventi cancelli (switch, sensore binario oppure lock). Per lock si usa la transizione da bloccato a sbloccato; non è un sensore di apertura fisica.",
           "door_contact": "Contatto porta (facoltativo)",
           "door_lock": "Serratura (facoltativa)",
-          "alarm": "Allarme (facoltativo)",
-          "legacy_all_away_binary": "Casa certamente vuota YAML (solo confronto, facoltativo)"
+          "alarm": "Allarme (facoltativo)"
         }
       },
       "reconfigure_choose": {
@@ -65,8 +62,7 @@
           "person_name": "Nome",
           "iphone_tracker": "Tracker telefono (facoltativo)",
           "watch_sensor": "Sensore BLE indossabile (facoltativo)",
-          "bag_sensor": "Sensore zaino (facoltativo)",
-          "legacy_presence_entity": "Stato FSM YAML attuale (facoltativo, solo confronto)"
+          "bag_sensor": "Sensore zaino (facoltativo)"
         }
       },
       "reconfigure_add": {
@@ -76,8 +72,7 @@
           "person_name": "Nome",
           "iphone_tracker": "Tracker telefono (facoltativo)",
           "watch_sensor": "Sensore BLE indossabile (facoltativo)",
-          "bag_sensor": "Sensore zaino (facoltativo)",
-          "legacy_presence_entity": "Stato FSM YAML attuale (facoltativo, solo confronto)"
+          "bag_sensor": "Sensore zaino (facoltativo)"
         }
       },
       "reconfigure_remove": {
@@ -104,7 +99,7 @@
   "options": {
     "step": {
       "init": {
-        "title": "Presenza famiglia RC2",
+        "title": "Presenza famiglia RC5",
         "menu_options": {
           "windows": "Finestre temporali",
           "bag_person": "Orari e giorni degli zaini"
