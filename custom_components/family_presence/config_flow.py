@@ -22,10 +22,12 @@ from .const import (
     CONF_HOUSEHOLD_NAME, CONF_IPHONE, CONF_LOCK, CONF_PEOPLE, CONF_PERSON_NAME,
     CONF_PERSON_ID,
     CONF_REFERENCE, CONF_LEGACY_AGGREGATE,
-    CONF_WATCH, DEFAULT_WINDOWS, DOMAIN,
+    CONF_WATCH, DEFAULT_WINDOWS, DOMAIN, CONF_OUTPUT_PROFILE,
 )
 from .fsm import BagPolicy
 from .bag_schedule import BagSchedule, legacy_schedule
+from .operational import RegisteredOutput, audit_registry, profile_from_options
+from .presentation import FINAL, SHADOW
 
 
 def entity(domain: str) -> EntitySelector:
@@ -127,7 +129,9 @@ class FamilyPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(step_id="another", data_schema=ANOTHER_SCHEMA)
 
     async def _finish_reconfigure(self, updates: dict[str, Any]) -> FlowResult:
-        """Keep the one existing config entry and reload only shadow runtime."""
+        """Reload only after validating that mapping changes happen in Shadow."""
+        if profile_from_options(self._get_reconfigure_entry().options) == FINAL:
+            return self.async_abort(reason="shadow_required")
         await self.async_set_unique_id("household")
         self._abort_if_unique_id_mismatch()
         return self.async_update_reload_and_abort(
@@ -138,6 +142,8 @@ class FamilyPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Edit source mappings and members without deleting the config entry."""
+        if profile_from_options(self._get_reconfigure_entry().options) == FINAL:
+            return self.async_abort(reason="shadow_required")
         members = self._get_reconfigure_entry().data[CONF_PEOPLE]
         actions = ["reconfigure_shared", "reconfigure_choose", "reconfigure_add"]
         if len(members) > 1:
@@ -314,15 +320,87 @@ class FamilyPresenceOptionsFlow(OptionsFlowWithReload):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
+        if profile_from_options(self.config_entry.options) == FINAL:
+            return self.async_show_menu(step_id="init", menu_options=["activation"])
         actions = ["windows"]
         if any(person.get(CONF_BAG) for person in self.config_entry.data[CONF_PEOPLE]):
             actions.append("bag_person")
+        actions.append("activation")
         return self.async_show_menu(step_id="init", menu_options=actions)
+
+    def _activation_audit(self):
+        """Inspect the current HA entity registry without renaming anything."""
+        from homeassistant.helpers import entity_registry as er
+
+        registry = er.async_get(self.hass)
+
+        def lookup(domain: str, unique_id: str) -> RegisteredOutput:
+            entity_id = registry.async_get_entity_id(domain, DOMAIN, unique_id)
+            record = registry.async_get(entity_id) if entity_id else None
+            return RegisteredOutput(
+                entity_id, bool(record is not None and record.disabled_by is not None)
+            )
+
+        return audit_registry(
+            self.config_entry.entry_id,
+            [(_person_key(person), person[CONF_PERSON_NAME])
+             for person in self.config_entry.data[CONF_PEOPLE]],
+            lookup,
+            legacy_aggregate=self.config_entry.data.get(CONF_LEGACY_AGGREGATE),
+        )
+
+    async def async_step_activation(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Typed opt-in / rollback; never rewire YAML or invoke HA services."""
+        current = profile_from_options(self.config_entry.options)
+        if current == FINAL:
+            if user_input is not None and user_input.get("confirmation") == "OMBRA":
+                return self.async_create_entry(data={
+                    **self.config_entry.options, CONF_OUTPUT_PROFILE: SHADOW
+                })
+            return self.async_show_form(
+                step_id="activation",
+                data_schema=vol.Schema({vol.Required("confirmation"): str}),
+                errors={"base": "invalid_confirmation"} if user_input is not None else {},
+                description_placeholders={
+                    "mode": "Final", "command": "OMBRA",
+                    "aggregate": "ID attuale nel registro entità",
+                },
+            )
+
+        audit = self._activation_audit()
+        if not audit.ready:
+            return self.async_show_form(
+                step_id="activation",
+                data_schema=vol.Schema({vol.Required("confirmation"): str}),
+                errors={"base": "registry_unready"},
+                description_placeholders={
+                    "mode": "Shadow", "command": "ATTIVA",
+                    "aggregate": ", ".join(audit.blockers),
+                },
+            )
+
+        if user_input is not None and user_input.get("confirmation") == "ATTIVA":
+            return self.async_create_entry(data={
+                **self.config_entry.options, CONF_OUTPUT_PROFILE: FINAL
+            })
+        return self.async_show_form(
+            step_id="activation",
+            data_schema=vol.Schema({vol.Required("confirmation"): str}),
+            errors={"base": "invalid_confirmation"} if user_input is not None else {},
+            description_placeholders={
+                "mode": "Shadow", "command": "ATTIVA",
+                "aggregate": audit.aggregate_entity_id or "—",
+            },
+        )
 
     async def async_step_windows(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Keep bag overrides when tuning the timestamp windows."""
+        if profile_from_options(self.config_entry.options) == FINAL:
+            return self.async_abort(reason="shadow_required")
         if user_input is not None:
             return self.async_create_entry(
                 data={**self.config_entry.options, **user_input}
@@ -339,6 +417,8 @@ class FamilyPresenceOptionsFlow(OptionsFlowWithReload):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Choose one person with a configured backpack sensor."""
+        if profile_from_options(self.config_entry.options) == FINAL:
+            return self.async_abort(reason="shadow_required")
         choices = {
             _person_key(p): p[CONF_PERSON_NAME]
             for p in self.config_entry.data[CONF_PEOPLE]
@@ -363,6 +443,8 @@ class FamilyPresenceOptionsFlow(OptionsFlowWithReload):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Configure one event-based ON→OFF window; OFF→ON is anytime."""
+        if profile_from_options(self.config_entry.options) == FINAL:
+            return self.async_abort(reason="shadow_required")
         key = self._selected_person
         people = {
             _person_key(p): p

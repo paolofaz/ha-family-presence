@@ -98,7 +98,8 @@
     "abort": {
       "already_configured": "Household is already configured.",
       "person_not_found": "Household member not found.",
-      "last_member": "At least one household member must remain."
+      "last_member": "At least one household member must remain.",
+      "shadow_required": "Return to Shadow before changing people or sensor inputs."
     }
   },
   "options": {
@@ -107,7 +108,8 @@
         "title": "Family Presence settings",
         "menu_options": {
           "windows": "Event correlation windows",
-          "bag_person": "Backpack time windows"
+          "bag_person": "Backpack time windows",
+          "activation": "RC1 activation / return to Shadow"
         }
       },
       "windows": {
@@ -138,15 +140,25 @@
           "end": "End time",
           "days": "Active weekdays"
         }
+      },
+      "activation": {
+        "title": "RC1 — output profile",
+        "description": "Current mode: {mode}. Aggregate output / preflight: {aggregate}. Only AFTER backup and review of the YAML cutover plan, type {command}. This does not edit automations, entity IDs or alarm. Returning to Shadow does not disconnect YAML automations!",
+        "data": {
+          "confirmation": "Typed confirmation"
+        }
       }
     },
     "error": {
       "invalid_person": "Person not available.",
       "invalid_policy": "Invalid backpack policy.",
-      "invalid_schedule": "Invalid backpack schedule."
+      "invalid_schedule": "Invalid backpack schedule.",
+      "invalid_confirmation": "Type the exact shown command.",
+      "registry_unready": "Entity registry is not ready: check listed mappings."
     },
     "abort": {
-      "person_not_found": "The person is no longer available or has no configured backpack."
+      "person_not_found": "The person is no longer available or has no configured backpack.",
+      "shadow_required": "Return to Shadow before changing source mappings and policies."
     }
   }
 }

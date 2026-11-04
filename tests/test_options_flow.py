@@ -147,12 +147,46 @@ class OptionsFlowTests(unittest.IsolatedAsyncioTestCase):
         flow = self.new()
         self.assertIsInstance(flow, self.base)
         menu = await flow.async_step_init()
-        self.assertEqual(menu["menu_options"], ["windows", "bag_person"])
+        self.assertEqual(menu["menu_options"], ["windows", "bag_person", "activation"])
+
+    async def test_rc1_requires_registry_and_explicit_confirmation(self):
+        flow = self.new()
+        flow._activation_audit = lambda: types.SimpleNamespace(
+            ready=True, aggregate_entity_id="binary_sensor.current_shadow"
+        )
+        form = await flow.async_step_activation()
+        self.assertEqual(form["step_id"], "activation")
+        self.assertEqual(form["description_placeholders"]["aggregate"],
+                         "binary_sensor.current_shadow")
+        wrong = await flow.async_step_activation({"confirmation": "yes"})
+        self.assertEqual(wrong["errors"]["base"], "invalid_confirmation")
+        result = await flow.async_step_activation({"confirmation": "ATTIVA"})
+        self.assertEqual(result["data"]["output_profile"], "final")
+        self.assertEqual(result["data"]["entry_gate_seconds"], 123)
+
+    async def test_rc1_refuses_incomplete_registry(self):
+        flow = self.new()
+        flow._activation_audit = lambda: types.SimpleNamespace(
+            ready=False, blockers=("aggregate_unregistered",),
+            aggregate_entity_id=None
+        )
+        result = await flow.async_step_activation({"confirmation": "ATTIVA"})
+        self.assertEqual(result["errors"]["base"], "registry_unready")
+
+    async def test_rc1_rollback_without_preflight_and_final_configuration_lock(self):
+        flow = self.new(options={"output_profile": "final", "exit_gate_seconds": 42})
+        self.assertEqual((await flow.async_step_init())["menu_options"], ["activation"])
+        incorrect = await flow.async_step_activation({"confirmation": "ATTIVA"})
+        self.assertEqual(incorrect["errors"]["base"], "invalid_confirmation")
+        result = await flow.async_step_activation({"confirmation": "OMBRA"})
+        self.assertEqual(result["data"]["output_profile"], "shadow")
+        self.assertEqual(result["data"]["exit_gate_seconds"], 42)
+        self.assertEqual((await flow.async_step_windows())["reason"], "shadow_required")
 
     async def test_no_bag_hides_bag_editor(self):
         flow = self.new(people=[self.people[1]])
         menu = await flow.async_step_init()
-        self.assertEqual(menu["menu_options"], ["windows"])
+        self.assertEqual(menu["menu_options"], ["windows", "activation"])
 
     async def test_windows_preserve_existing_bag_preferences(self):
         flow = self.new()
