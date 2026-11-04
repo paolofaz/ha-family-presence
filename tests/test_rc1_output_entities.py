@@ -42,7 +42,7 @@ class RC1OutputEntityTests(unittest.IsolatedAsyncioTestCase):
         final = sensor.ShadowPersonSensor("entry", self.engine, "paolo", FINAL)
         self.assertEqual(shadow._attr_unique_id, final._attr_unique_id)
         self.assertIsNone(final._attr_entity_category)
-        self.assertEqual(final._attr_name, "Presenza")
+        self.assertEqual(final._attr_name, "Presenza Paolo")
         self.assertIsNone(final.native_value)
         await self.engine.force_state("paolo", State.AWAY)
         self.assertEqual(final.native_value, "away")

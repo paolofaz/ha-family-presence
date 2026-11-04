@@ -34,7 +34,7 @@ class RC1PresentationTests(unittest.TestCase):
         ):
             old = person_presentation("entry123", key, name, SHADOW)
             new = person_presentation("entry123", key, name, FINAL)
-            self.assertEqual(new.name, "Presenza")
+            self.assertEqual(new.name, f"Presenza {name}")
             self.assertFalse(new.diagnostic)
             self.assertTrue(old.diagnostic)
             self.assertEqual(new.unique_id, old.unique_id)
@@ -75,7 +75,7 @@ class RC1PresentationTests(unittest.TestCase):
         # Important invariant: setting a future display name does NOT claim a
         # HA entity_id and does not activate any automation.
         self.assertEqual(person_presentation("e", "p", "Paolo").name,
-                         "Presenza")
+                         "Presenza Paolo")
         self.assertEqual(aggregate_presentation("e").name,
                          "Casa certamente vuota")
 

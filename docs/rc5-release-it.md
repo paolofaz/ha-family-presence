@@ -9,12 +9,12 @@ una volta superati test Python, HACS e hassfest.
   `content_in_root`, manifest di repository e asset di release
   `family_presence.zip` con file estratti direttamente nella cartella
   `custom_components/family_presence`.
-- **Un dispositivo virtuale per ogni persona**: il sensore `Presenza`,
-  il pulsante `Forza a casa` e il pulsante `Forza fuori casa` sono
-  raggruppati sotto un dispositivo con il nome della persona.
-- Un dispositivo virtuale `Famiglia` raccoglie
-  `Casa certamente vuota` e `Diagnostica`. Per quattro persone rimangono
-  quattordici entità, ma sono distribuite su cinque dispositivi.
+- **Un solo dispositivo virtuale `Casa`** raccoglie tutte le entità.
+  Ogni persona mantiene un sensore di presenza autonomo (per esempio
+  `Presenza Paolo`) e due pulsanti di forzatura con il nome della persona.
+  `Casa certamente vuota` e `Diagnostica presenza` restano nello stesso
+  dispositivo. Per quattro persone rimangono quattordici entità distinte,
+  raccolte sotto un unico dispositivo.
 - Non ci sono più nei form di configurazione né il confronto con
   `binary_sensor.casa_certamente_vuota` né gli `input_select` della vecchia
   FSM. Le impostazioni legacy eventualmente salvate vengono ignorate in
@@ -40,7 +40,7 @@ Se la versione precedente è ancora nella cache, usare **Aggiorna informazioni**
 Controllare **Impostazioni → Dispositivi e servizi → Presenza famiglia →
 Dispositivi**: dovrebbero comparire Famiglia, Paolo, Cristina, Giulia,
 Arianna (o i membri effettivamente configurati).
-La distribuzione dei dispositivi avviene mantenendo i vecchi
+Il raggruppamento delle entità avviene mantenendo i vecchi
 `unique_id`; gli `entity_id` già registrati potrebbero ancora contenere
 `shadow`. Il nome visualizzato non li rinomina.
 

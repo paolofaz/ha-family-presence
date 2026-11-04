@@ -20,7 +20,7 @@ class RC5EntityGroupingTests(unittest.IsolatedAsyncioTestCase):
             read_state=lambda _id: None,
         )
 
-    async def test_person_and_buttons_share_device_but_not_household(self):
+    async def test_all_entities_share_one_household_device(self):
         sensor = load_sensor_module()
         binary = load_binary_sensor_module()
         buttons = load_buttons()
@@ -36,7 +36,7 @@ class RC5EntityGroupingTests(unittest.IsolatedAsyncioTestCase):
         away_button = buttons.ShadowForceButton(
             "entry", runtime, "paolo", State.AWAY
         )
-        self.assertEqual(presence._attr_name, "Presenza")
+        self.assertEqual(presence._attr_name, "Presenza Paolo")
         self.assertTrue(presence._attr_has_entity_name)
         self.assertEqual(presence._attr_unique_id, "entry_paolo_shadow")
         self.assertEqual(
@@ -51,11 +51,13 @@ class RC5EntityGroupingTests(unittest.IsolatedAsyncioTestCase):
             household._attr_device_info["identifiers"],
             all_away._attr_device_info["identifiers"],
         )
-        self.assertNotEqual(
+        self.assertEqual(
             household._attr_device_info["identifiers"],
             presence._attr_device_info["identifiers"],
         )
+        self.assertEqual(presence._attr_device_info["name"], "Casa")
         self.assertEqual(all_away._attr_name, "Casa certamente vuota")
+        self.assertEqual(home_button._attr_name, "Paolo — Forza a casa")
 
     async def test_final_state_attributes_do_not_expose_yaml_comparison(self):
         sensor = load_sensor_module()

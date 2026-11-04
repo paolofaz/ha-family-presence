@@ -1,25 +1,18 @@
-"""Stable virtual devices: one household and one device per person.
+"""One stable virtual Home Assistant device for the entire household.
 
-A Home Assistant device groups entities. It is not a physical actuator.
-Identifiers remain independent of display names and source sensor mappings.
+The individual sensors are separate entities, but every entity is attached to
+the same virtual household device. This exposes no physical actuator.
 """
 from __future__ import annotations
+
 from .const import DOMAIN
 
 
-def member_device_info(entry_id: str, person_key: str, name: str) -> dict:
-    return {
-        "identifiers": {(DOMAIN, f"{entry_id}_person_{person_key}")},
-        "name": name,
-        "manufacturer": "Family Presence",
-        "model": "FSM individuale",
-    }
-
-
 def household_device_info(entry_id: str) -> dict:
+    """Stable across configuration edits, restarts and display-name changes."""
     return {
         "identifiers": {(DOMAIN, f"{entry_id}_household")},
-        "name": "Famiglia",
+        "name": "Casa",
         "manufacturer": "Family Presence",
-        "model": "FSM aggregata",
+        "model": "FSM familiare",
     }
