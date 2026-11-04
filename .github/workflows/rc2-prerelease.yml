@@ -1,0 +1,78 @@
+name: Publish RC2 prerelease
+on:
+  push:
+    branches:
+      - release/0.1.0rc2
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: family-presence-rc2-prerelease
+  cancel-in-progress: false
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m unittest discover -s tests -v
+      - run: python -m compileall -q custom_components tests
+
+  validate-hacs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration
+
+  hassfest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  publish-prerelease:
+    needs: [unit-tests, validate-hacs, hassfest]
+    if: github.repository == 'paolofaz/ha-family-presence'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify release commit is branch head and manifest matches
+        shell: bash
+        run: |
+          CURRENT=$(git ls-remote --exit-code origin refs/heads/release/0.1.0rc2 | cut -f1)
+          if [ "$CURRENT" != "$GITHUB_SHA" ]; then
+            echo "::error::A newer RC2 commit exists; refusing release"
+            exit 1
+          fi
+          python -c "import json; from pathlib import Path; assert json.loads(Path('custom_components/family_presence/manifest.json').read_text())['version'] == '0.1.0rc2'"
+      - name: Publish v0.1.0rc2 as a GitHub prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.1.0rc2 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            REMOTE=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v0.1.0rc2" --jq '.object.sha')
+            if [ "$REMOTE" = "$GITHUB_SHA" ]; then
+              echo "RC2 prerelease already published at the same commit."
+              exit 0
+            fi
+            echo "::error::v0.1.0rc2 already exists at a different commit; refusing to overwrite"
+            exit 1
+          fi
+          gh release create v0.1.0rc2 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Family Presence v0.1.0rc2 — collaudo operativo" \
+            --notes-file docs/rc2-release-notes-it.md \
+            --prerelease --latest=false
