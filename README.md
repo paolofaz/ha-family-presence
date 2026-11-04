@@ -5,12 +5,12 @@ Sources: phone tracker, Watch BLE, optional bag BLE sensor and shared
 gate/door/lock/alarm evidence. The original private family YAML is **not**
 included in this repository.
 
-> **Latest: v0.1.0rc4.** HACS uses the `family_presence.zip` release asset and
+> **Latest: v0.1.0rc5.** HACS uses the `family_presence.zip` release asset and
 > the repository-root `manifest.json` to identify the integration before installing.
 > The same manifest is also shipped in `custom_components/family_presence/`.
 > **Do not disable existing YAML alarm or presence automations before a supervised cutover.**
 > The integration itself never actuates alarm, door locks or heating.
-> See [RC4 release notes](docs/rc4-release-it.md) and [RC2/RC4 migration](docs/rc2-migrazione-it.md).
+> See [RC5 release notes](docs/rc5-release-it.md) and [RC2/RC5 migration](docs/rc2-migrazione-it.md).
 
 ## What the FSM computes
 
