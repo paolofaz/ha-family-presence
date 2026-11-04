@@ -193,6 +193,19 @@ class BagReturnCausalityTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(restored.runtime["kid"].bag_return_eligible)
         self.assertEqual((await self.bag_arrived(restored)).current, State.HOME)
 
+    async def test_disabled_schedule_revokes_restored_bag_authority(self):
+        first = self.engine()
+        first.runtime["kid"].state = State.HOME
+        await self.bag_left(first)
+        snapshot = first.snapshot()
+        disabled = self.engine(schedule=BagSchedule(
+            False, "00:00", "00:00", ALL_DAYS,
+        ))
+        self.assertEqual(disabled.restore_snapshot(snapshot), 1)
+        self.assertFalse(disabled.runtime["kid"].bag_return_eligible)
+        self.assertIsNone(await self.bag_arrived(disabled))
+        self.assertEqual(disabled.state("kid"), State.AWAY)
+
     async def test_pre_rc6_snapshot_fails_closed_even_if_reason_claims_bag(self):
         initial = self.engine()
         initial.runtime["kid"].state = State.HOME
