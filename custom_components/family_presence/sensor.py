@@ -8,6 +8,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import ShadowCoordinator
 from .labels import reason_label
+from .visible_updates import capture_visible_state, async_write_if_visible_changed
 from .devices import household_device_info
 from .presentation import FINAL, SHADOW, person_presentation, household_presentation
 
@@ -43,6 +44,7 @@ class ShadowPersonSensor(SensorEntity):
         self._attr_has_entity_name = True
         self._attr_device_info = household_device_info(entry_id)
         self._attr_entity_category = EntityCategory.DIAGNOSTIC if presentation.diagnostic else None
+        self._last_visible_state = capture_visible_state(self, self.native_value)
 
     @property
     def native_value(self) -> str | None:
@@ -51,9 +53,21 @@ class ShadowPersonSensor(SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict:
-        """Include provenance and conflicts, not Bluetooth identity or secrets."""
+        """Stable, recorder-friendly attributes for production presence."""
         p = self.engine.people[self.person]
         rt = self.engine.runtime[self.person]
+        if self.profile == FINAL:
+            attributes = {
+                "reason": reason_label(rt.last_reason),
+                "last_transition": (
+                    rt.last_changed.isoformat() if rt.last_changed else None
+                ),
+            }
+            if p.bag:
+                attributes["bag_return_eligible"] = (
+                    rt.bag_return_eligible and p.bag_schedule.enabled
+                )
+            return attributes
         bag = self.engine._read(p.bag) if p.bag else None
         legacy = self.engine._read(p.reference) if self.profile == SHADOW and p.reference else None
         data = {
@@ -113,12 +127,13 @@ class ShadowPersonSensor(SensorEntity):
     async def async_added_to_hass(self) -> None:
         """Subscribe after Home Assistant has added the entity."""
         await super().async_added_to_hass()
+        self._last_visible_state = capture_visible_state(self, self.native_value)
         self.async_on_remove(self.engine.async_add_listener(self._shadow_updated))
 
     @callback
     def _shadow_updated(self, person: str) -> None:
         if person == self.person:
-            self.async_write_ha_state()
+            async_write_if_visible_changed(self, self.native_value)
 
 
 class ShadowHouseholdSensor(SensorEntity):
@@ -137,6 +152,7 @@ class ShadowHouseholdSensor(SensorEntity):
         self._attr_name = presentation.name
         self._attr_has_entity_name = True
         self._attr_device_info = household_device_info(entry_id)
+        self._last_visible_state = capture_visible_state(self, self.native_value)
 
     @property
     def native_value(self) -> str:
@@ -145,6 +161,16 @@ class ShadowHouseholdSensor(SensorEntity):
     @property
     def extra_state_attributes(self) -> dict:
         assessment = self.engine.household_assessment()
+        if self.profile == FINAL:
+            # Only source anomalies belong on the household diagnostic entity.
+            if not assessment.source_warnings:
+                return {}
+            return {
+                "source_warnings": {
+                    self.engine.people[key].name: list(warnings)
+                    for key, warnings in assessment.source_warnings.items()
+                }
+            }
         comparison = self.engine.legacy_comparison()
         data = {
             "mode": "shadow_only" if self.profile == SHADOW else "final",
@@ -196,8 +222,9 @@ class ShadowHouseholdSensor(SensorEntity):
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
+        self._last_visible_state = capture_visible_state(self, self.native_value)
         self.async_on_remove(self.engine.async_add_listener(self._updated))
 
     @callback
     def _updated(self, _person: str) -> None:
-        self.async_write_ha_state()
+        async_write_if_visible_changed(self, self.native_value)
