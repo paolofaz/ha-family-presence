@@ -70,24 +70,17 @@ class ReconfigureFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.flow._unique_id, "household")
         self.assertTrue(self.flow._checked_unique_id)
 
-    async def test_read_only_legacy_binary_can_be_configured_or_cleared(self):
+    async def test_legacy_aggregate_is_not_shown_and_gate_lock_can_be_selected(self):
         schema = (await self.flow.async_step_reconfigure_shared())["schema"]
-        self.assertIn("legacy_all_away_binary", schema)
+        self.assertNotIn("legacy_all_away_binary", schema)
+        selector = schema["gate_entities"]
+        self.assertIn("lock", selector["domain"])
         out = await self.flow.async_step_reconfigure_shared({
             "household_name": "Household",
-            "legacy_all_away_binary": "binary_sensor.casa_certamente_vuota",
+            "gate_entities": ["lock.gate"],
         })
         self.assertTrue(out["reloaded"])
-        self.assertEqual(
-            self.entry.data["legacy_all_away_binary"],
-            "binary_sensor.casa_certamente_vuota",
-        )
-        out = await self.flow.async_step_reconfigure_shared({
-            "household_name": "Household",
-        })
-        self.assertTrue(out["reloaded"])
-        self.assertIsNone(self.entry.data["legacy_all_away_binary"])
-        self.assertEqual(self.entry.data["people"], self.members)
+        self.assertEqual(self.entry.data["gate_entities"], ["lock.gate"])
 
     async def test_name_change_preserves_immutable_id(self):
         await self.flow.async_step_reconfigure_choose({"person": "stable-child"})
@@ -96,13 +89,12 @@ class ReconfigureFlowTests(unittest.IsolatedAsyncioTestCase):
             "iphone_tracker": "device_tracker.child",
             "watch_sensor": "binary_sensor.watch_child",
             "bag_sensor": "binary_sensor.bag",
-            "legacy_presence_entity": "input_select.child",
         })
         self.assertTrue(result["reloaded"])
         changed = self.entry.data["people"][0]
         self.assertEqual(changed["person_id"], "stable-child")
         self.assertEqual(changed["person_name"], "Renamed Child")
-        self.assertEqual(changed["legacy_presence_entity"], "input_select.child")
+        self.assertNotIn("legacy_presence_entity", changed)
         self.assertEqual(changed["bag_policy"], "always")
         self.assertEqual(self.entry.data["people"][1], self.members[1])
 

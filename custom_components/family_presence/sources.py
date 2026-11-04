@@ -17,8 +17,7 @@ from homeassistant.util import dt as dt_util
 from .const import (
     CONF_ALARM, CONF_BAG, CONF_BAG_POLICY, CONF_BAG_POLICIES, CONF_BAG_SCHEDULES,
     CONF_DOOR, CONF_GATE_ENTITIES,
-    CONF_IPHONE, CONF_LOCK, CONF_PEOPLE, CONF_PERSON_NAME, CONF_PERSON_ID, CONF_REFERENCE,
-    CONF_LEGACY_AGGREGATE, CONF_WATCH,
+    CONF_IPHONE, CONF_LOCK, CONF_PEOPLE, CONF_PERSON_NAME, CONF_PERSON_ID, CONF_WATCH,
 )
 from .coordinator import PersonSources, ShadowBlocked, ShadowCoordinator, ShadowDecision, ShadowIgnored, Windows
 from .fsm import BagPolicy, Event
@@ -27,6 +26,17 @@ from .labels import reason_label
 
 _LOGGER = logging.getLogger(__name__)
 _INVALID = frozenset(("unknown", "unavailable"))
+
+
+def _gate_opening(entity_id: str, old: str, new: str) -> bool:
+    """Gate pulse or gate lock unlock: physical evidence, never an actuator call.
+
+    A lock state is not a reed contact. For gates, an explicit unlock transition
+    is accepted as the control event; no persistent gate-open state is assumed.
+    """
+    if entity_id.startswith("lock."):
+        return old in ("locked", "unlocking") and new in ("unlocked", "open")
+    return old == "off" and new == "on"
 
 
 def _last_seen(value: Any) -> datetime | None:
@@ -54,7 +64,7 @@ def _person_specs(
             iphone=p.get(CONF_IPHONE),
             watch=p.get(CONF_WATCH),
             bag=p.get(CONF_BAG),
-            reference=p.get(CONF_REFERENCE),
+            reference=None,  # Old YAML comparisons are no longer part of runtime.
             bag_policy=BagPolicy(policies.get(
                 p.get(CONF_PERSON_ID) or p[CONF_PERSON_NAME].strip().casefold(),
                 p.get(CONF_BAG_POLICY, BagPolicy.LEGACY.value),
@@ -75,7 +85,7 @@ def _person_specs(
 
 
 def build_coordinator(hass: HomeAssistant, entry: Any) -> ShadowCoordinator:
-    """Build independent shadow FSM; legacy input_select is a comparison only."""
+    """Build production FSM without reading any previous YAML presence helpers."""
     config, options = entry.data, entry.options
     defaults = Windows()
     window_data = {
@@ -119,7 +129,7 @@ def build_coordinator(hass: HomeAssistant, entry: Any) -> ShadowCoordinator:
         read_state=read_state,
         windows=Windows(**window_data),
         alarm=config.get(CONF_ALARM),
-        legacy_aggregate=config.get(CONF_LEGACY_AGGREGATE),
+        legacy_aggregate=None,  # Ignore any retained Beta/RC4 comparison setting.
         local_timezone=ZoneInfo(hass.config.time_zone),
         report=report,
         report_block=report_block,
@@ -212,7 +222,7 @@ class ShadowSourceAdapter:
             return
 
         physical: str | None = None
-        if entity_id in self._gates and (old, new) == ("off", "on"):
+        if entity_id in self._gates and _gate_opening(entity_id, old, new):
             physical = "gate"
         elif entity_id == self._door:
             physical = {("off", "on"): "door_open", ("on", "off"): "door_close"}.get((old, new))

@@ -34,7 +34,7 @@ def person_presentation(entry_id: str, person_key: str, name: str,
     _check_profile(profile)
     return Presentation(
         name=(f"Family Presence Shadow {name}"
-              if profile == SHADOW else f"Presenza famiglia {name}"),
+              if profile == SHADOW else "Presenza"),
         unique_id=f"{entry_id}_{person_key}_shadow",
         diagnostic=profile == SHADOW,
     )
@@ -45,7 +45,7 @@ def aggregate_presentation(entry_id: str,
     _check_profile(profile)
     return Presentation(
         name=("Family Presence Shadow - Casa certamente vuota"
-              if profile == SHADOW else "Presenza famiglia - Casa certamente vuota"),
+              if profile == SHADOW else "Casa certamente vuota"),
         unique_id=f"{entry_id}_all_away_shadow",
         diagnostic=profile == SHADOW,
     )
@@ -56,7 +56,7 @@ def household_presentation(entry_id: str,
     _check_profile(profile)
     return Presentation(
         name=("Family Presence Shadow - Diagnostica casa"
-              if profile == SHADOW else "Presenza famiglia - Diagnostica casa"),
+              if profile == SHADOW else "Diagnostica"),
         unique_id=f"{entry_id}_household_readiness_shadow",
         diagnostic=True,  # A diagnostic even after final cutover.
     )
@@ -68,9 +68,9 @@ def force_presentation(entry_id: str, person_key: str, name: str,
     if target not in ("home", "away"):
         raise ValueError("A manual button can only force home or away")
     action = "Forza a casa" if target == "home" else "Forza fuori casa"
-    prefix = f"Family Presence Shadow {name}" if profile == SHADOW else f"Presenza famiglia {name}"
+    prefix = f"Family Presence Shadow {name}" if profile == SHADOW else ""
     return Presentation(
-        name=f"{prefix} — {action}",
+        name=f"{prefix} — {action}" if profile == SHADOW else action,
         unique_id=f"{entry_id}_{person_key}_shadow_force_{target}",
         diagnostic=profile == SHADOW,
     )

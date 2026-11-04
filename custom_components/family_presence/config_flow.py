@@ -1,6 +1,6 @@
 """Config flow for one household with configurable input entities per person.
 
-Configuration and reconfiguration only update the shadow integration until release.
+The final FSM has no legacy YAML comparison inputs in its configuration.
 """
 from __future__ import annotations
 from typing import Any
@@ -21,7 +21,6 @@ from .const import (
     CONF_DOOR, CONF_GATE_ENTITIES,
     CONF_HOUSEHOLD_NAME, CONF_IPHONE, CONF_LOCK, CONF_PEOPLE, CONF_PERSON_NAME,
     CONF_PERSON_ID,
-    CONF_REFERENCE, CONF_LEGACY_AGGREGATE,
     CONF_WATCH, DEFAULT_WINDOWS, DOMAIN,
 )
 from .fsm import BagPolicy
@@ -35,19 +34,17 @@ def entity(domain: str) -> EntitySelector:
 HOUSEHOLD_SCHEMA = vol.Schema({
     vol.Required(CONF_HOUSEHOLD_NAME, default="Home"): str,
     vol.Optional(CONF_GATE_ENTITIES): EntitySelector(
-        EntitySelectorConfig(domain=["switch", "binary_sensor"], multiple=True)
+        EntitySelectorConfig(domain=["switch", "binary_sensor", "lock"], multiple=True)
     ),
     vol.Optional(CONF_DOOR): entity("binary_sensor"),
     vol.Optional(CONF_LOCK): entity("lock"),
     vol.Optional(CONF_ALARM): entity("alarm_control_panel"),
-    vol.Optional(CONF_LEGACY_AGGREGATE): entity("binary_sensor"),
 })
 PERSON_SCHEMA = vol.Schema({
     vol.Required(CONF_PERSON_NAME): str,
     vol.Optional(CONF_IPHONE): entity("device_tracker"),
     vol.Optional(CONF_WATCH): entity("binary_sensor"),
     vol.Optional(CONF_BAG): entity("binary_sensor"),
-    vol.Optional(CONF_REFERENCE): entity("input_select"),
 })
 # Source mapping belongs to Reconfigure, behavioral choices to Configure.
 PERSON_RECONFIGURE_SCHEMA = vol.Schema({
@@ -55,7 +52,6 @@ PERSON_RECONFIGURE_SCHEMA = vol.Schema({
     vol.Optional(CONF_IPHONE): entity("device_tracker"),
     vol.Optional(CONF_WATCH): entity("binary_sensor"),
     vol.Optional(CONF_BAG): entity("binary_sensor"),
-    vol.Optional(CONF_REFERENCE): entity("input_select"),
 })
 
 
@@ -152,7 +148,7 @@ class FamilyPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Update shared physical sensor mappings, without touching people."""
         entry = self._get_reconfigure_entry()
         shared_fields = (CONF_HOUSEHOLD_NAME, CONF_GATE_ENTITIES, CONF_DOOR,
-                         CONF_LOCK, CONF_ALARM, CONF_LEGACY_AGGREGATE)
+                         CONF_LOCK, CONF_ALARM)
         if user_input is not None:
             title = user_input[CONF_HOUSEHOLD_NAME].strip()
             if title:
