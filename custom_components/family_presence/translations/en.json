@@ -4,10 +4,10 @@
     "step": {
       "user": {
         "title": "Household",
-        "description": "Select common household inputs. The Python FSM publishes final states; YAML automations continue to control the alarm.",
+        "description": "Select shared inputs. A gate lock unlock is treated as an event, not a confirmed physical opening. Alarm control remains in external YAML.",
         "data": {
           "household_name": "Household name",
-          "gate_entities": "Gate events (switch, binary sensor or lock). For lock, a locked-to-unlocked transition counts as gate evidence, not confirmed physical opening.",
+          "gate_entities": "Gate events (switch, binary sensor, or lock)",
           "door_contact": "Door contact (optional)",
           "door_lock": "Door lock (optional)",
           "alarm": "Alarm (optional)"
@@ -40,10 +40,10 @@
       },
       "reconfigure_shared": {
         "title": "Shared household sensors",
-        "description": "Edit shared inputs, including optional gate lock entities.",
+        "description": "Edit shared inputs. Gate locks produce an event on locked-to-unlocked transitions; if the lock does not change state, choose the Shelly pulse instead.",
         "data": {
           "household_name": "Household name",
-          "gate_entities": "Gate events (switch, binary sensor or lock). For lock, a locked-to-unlocked transition counts as gate evidence, not confirmed physical opening.",
+          "gate_entities": "Gate events (switch, binary sensor, or lock)",
           "door_contact": "Door contact (optional)",
           "door_lock": "Door lock (optional)",
           "alarm": "Alarm (optional)"

@@ -4,10 +4,10 @@
     "step": {
       "user": {
         "title": "Abitazione",
-        "description": "Seleziona le sorgenti comuni della casa. La FSM Python produce gli stati definitivi; le automazioni YAML continuano a gestire l'allarme.",
+        "description": "Seleziona le sorgenti condivise. Per un cancello lock si utilizza lo sblocco come evento, non una conferma di apertura. L'allarme rimane gestito dalle automazioni YAML.",
         "data": {
           "household_name": "Nome abitazione",
-          "gate_entities": "Eventi cancelli (switch, sensore binario oppure lock). Per lock si usa la transizione da bloccato a sbloccato; non è un sensore di apertura fisica.",
+          "gate_entities": "Eventi cancelli (switch, sensore binario o lock)",
           "door_contact": "Contatto porta (facoltativo)",
           "door_lock": "Serratura (facoltativa)",
           "alarm": "Allarme (facoltativo)"
@@ -40,10 +40,10 @@
       },
       "reconfigure_shared": {
         "title": "Sensori condivisi dell'abitazione",
-        "description": "Modifica le sorgenti comuni, incluse eventuali entità lock per i cancelli.",
+        "description": "Modifica le sorgenti condivise. I cancelli lock generano un evento quando passano da locked a unlocked; se non cambiano stato, scegli il comando Shelly.",
         "data": {
           "household_name": "Nome abitazione",
-          "gate_entities": "Eventi cancelli (switch, sensore binario oppure lock). Per lock si usa la transizione da bloccato a sbloccato; non è un sensore di apertura fisica.",
+          "gate_entities": "Eventi cancelli (switch, sensore binario o lock)",
           "door_contact": "Contatto porta (facoltativo)",
           "door_lock": "Serratura (facoltativa)",
           "alarm": "Allarme (facoltativo)"

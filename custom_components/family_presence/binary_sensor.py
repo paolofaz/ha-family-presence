@@ -40,7 +40,8 @@ class ShadowAllAwayBinarySensor(BinarySensorEntity):
         presentation = aggregate_presentation(entry_id, profile)
         self._attr_name = presentation.name
         self._attr_unique_id = presentation.unique_id
-        self._attr_has_entity_name = True
+        # The aggregate already has a complete name; avoid "Casa Casa ...".
+        self._attr_has_entity_name = False
         self._attr_device_info = household_device_info(entry_id)
         self._attr_entity_category = EntityCategory.DIAGNOSTIC if presentation.diagnostic else None
 
