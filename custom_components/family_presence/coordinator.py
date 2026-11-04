@@ -368,6 +368,7 @@ class ShadowCoordinator:
                 and record.get("bag_return_eligible") is True
                 and saved_state in (State.AWAY, State.NEAR_HOME)
                 and bool(self.people[key].bag)
+                and self.people[key].bag_schedule.enabled
             )
 
             reason = record.get("reason")
