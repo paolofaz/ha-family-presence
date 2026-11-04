@@ -77,7 +77,7 @@ class RC1PresentationTests(unittest.TestCase):
         self.assertEqual(person_presentation("e", "p", "Paolo").name,
                          "Presenza")
         self.assertEqual(aggregate_presentation("e").name,
-                         "Presenza famiglia - Casa certamente vuota")
+                         "Casa certamente vuota")
 
 
 if __name__ == "__main__":
