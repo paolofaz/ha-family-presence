@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .fsm import State
-from .presentation import force_presentation
+from .presentation import SHADOW, force_presentation
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,9 +41,11 @@ class ShadowForceButton(ButtonEntity):
         self.person = person
         self.target = target
         name = self.engine.people[person].name
-        presentation = force_presentation(entry_id, person, name, target.value)
+        self.profile = getattr(runtime, "profile", SHADOW)
+        presentation = force_presentation(entry_id, person, name, target.value, self.profile)
         self._attr_unique_id = presentation.unique_id
         self._attr_name = presentation.name
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC if presentation.diagnostic else None
         self._attr_icon = "mdi:home-import-outline" if target == State.HOME else "mdi:home-export-outline"
 
     async def async_press(self) -> None:
@@ -51,6 +53,6 @@ class ShadowForceButton(ButtonEntity):
         decision = await self.engine.force_state(self.person, self.target)
         await self.runtime.store.async_save(self.engine.snapshot())
         _LOGGER.warning(
-            "[shadow][manual] persona=%s stato=%s (solo simulazione)",
-            self.person, decision.current.value,
+            "[%s][manual] persona=%s stato=%s (l\u0027allarme resta gestito da YAML)",
+            self.profile, self.person, decision.current.value,
         )

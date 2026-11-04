@@ -1,12 +1,13 @@
-"""Family Presence: experimental read-only shadow diagnostics.
+"""Family Presence: independent FSM, optional controlled output profile.
 
-Legacy YAML remains the only production writer. No alarm, lock or heating
-service calls exist in this integration.
+This integration does not modify external YAML or command HA actuators.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+from .operational import profile_from_options
 
 
 if TYPE_CHECKING:
@@ -26,6 +27,7 @@ class ShadowRuntime:
     adapter: ShadowSourceAdapter
     store: Store
     unsubscribe_save: object
+    profile: str
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -47,7 +49,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         lambda _person: store.async_delay_save(engine.snapshot, 2)
     )
     adapter = ShadowSourceAdapter(hass, entry.data, engine)
-    entry.runtime_data = ShadowRuntime(engine, adapter, store, unsubscribe_save)
+    entry.runtime_data = ShadowRuntime(
+        engine, adapter, store, unsubscribe_save, profile_from_options(entry.options)
+    )
     try:
         adapter.start()
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

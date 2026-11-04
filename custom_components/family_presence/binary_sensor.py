@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import ShadowCoordinator
-from .presentation import DEFAULT_PROFILE, FINAL, aggregate_presentation
+from .presentation import SHADOW, FINAL, aggregate_presentation
 
 
 async def async_setup_entry(
@@ -18,7 +18,10 @@ async def async_setup_entry(
 ) -> None:
     """Expose the precise on/off result of all configured shadow FSM states."""
     async_add_entities([
-        ShadowAllAwayBinarySensor(entry.entry_id, entry.runtime_data.engine)
+        ShadowAllAwayBinarySensor(
+            entry.entry_id, entry.runtime_data.engine,
+            getattr(entry.runtime_data, "profile", SHADOW),
+        )
     ])
 
 
@@ -29,11 +32,14 @@ class ShadowAllAwayBinarySensor(BinarySensorEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:home-export-outline"
 
-    def __init__(self, entry_id: str, engine: ShadowCoordinator) -> None:
+    def __init__(self, entry_id: str, engine: ShadowCoordinator,
+                 profile: str = SHADOW) -> None:
         self.engine = engine
-        presentation = aggregate_presentation(entry_id)
+        self.profile = profile
+        presentation = aggregate_presentation(entry_id, profile)
         self._attr_name = presentation.name
         self._attr_unique_id = presentation.unique_id
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC if presentation.diagnostic else None
 
     @property
     def is_on(self) -> bool:
@@ -44,13 +50,14 @@ class ShadowAllAwayBinarySensor(BinarySensorEntity):
         assessment = self.engine.household_assessment()
         comparison = self.engine.legacy_comparison()
         return {
-            "mode": "shadow_only",
-            "do_not_use_for_automations": True,
-            "not_the_legacy_casa_certamente_vuota": True,
+            "mode": "shadow_only" if self.profile == SHADOW else "final",
+            "do_not_use_for_automations": self.profile == SHADOW,
+            "not_the_legacy_casa_certamente_vuota": self.profile == SHADOW,
+            "entity_id_review_required": True,
             "aggregation_rule": "all_configured_members_away",
-            "output_profile": DEFAULT_PROFILE,
+            "output_profile": self.profile,
             "planned_final_name": aggregate_presentation("_preview_", FINAL).name,
-            "cutover_active": False,
+            "cutover_active": self.profile == FINAL,
             "legacy_comparison_status": comparison.status,
             "legacy_expected_all_away": comparison.legacy_expected_all_away,
             "aggregate_matches_legacy": comparison.aggregate_matches_legacy,

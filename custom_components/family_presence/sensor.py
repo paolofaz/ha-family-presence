@@ -8,7 +8,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import ShadowCoordinator
 from .labels import reason_label
-from .presentation import FINAL, person_presentation, household_presentation
+from .presentation import FINAL, SHADOW, person_presentation, household_presentation
 
 
 async def async_setup_entry(
@@ -16,10 +16,11 @@ async def async_setup_entry(
 ) -> None:
     """Expose one diagnostically marked shadow sensor per configured person."""
     engine = entry.runtime_data.engine
+    profile = getattr(entry.runtime_data, "profile", SHADOW)
     async_add_entities([
-        *(ShadowPersonSensor(entry.entry_id, engine, person_id)
+        *(ShadowPersonSensor(entry.entry_id, engine, person_id, profile)
           for person_id in engine.people),
-        ShadowHouseholdSensor(entry.entry_id, engine),
+        ShadowHouseholdSensor(entry.entry_id, engine, profile),
     ])
 
 
@@ -30,12 +31,15 @@ class ShadowPersonSensor(SensorEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:account-question"
 
-    def __init__(self, entry_id: str, engine: ShadowCoordinator, person: str) -> None:
+    def __init__(self, entry_id: str, engine: ShadowCoordinator, person: str,
+                 profile: str = SHADOW) -> None:
         self.engine = engine
         self.person = person
-        presentation = person_presentation(entry_id, person, engine.people[person].name)
+        self.profile = profile
+        presentation = person_presentation(entry_id, person, engine.people[person].name, profile)
         self._attr_name = presentation.name
         self._attr_unique_id = presentation.unique_id
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC if presentation.diagnostic else None
 
     @property
     def native_value(self) -> str | None:
@@ -50,8 +54,9 @@ class ShadowPersonSensor(SensorEntity):
         bag = self.engine._read(p.bag) if p.bag else None
         legacy = self.engine._read(p.reference) if p.reference else None
         return {
-            "mode": "shadow_only",
-            "do_not_use_for_automations": True,
+            "mode": "shadow_only" if self.profile == SHADOW else "final",
+            "do_not_use_for_automations": self.profile == SHADOW,
+            "cutover_active": self.profile == FINAL,
             "planned_final_name": person_presentation(
                 "_preview_", self.person, p.name, FINAL
             ).name,
@@ -114,9 +119,11 @@ class ShadowHouseholdSensor(SensorEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:home-search-outline"
 
-    def __init__(self, entry_id: str, engine: ShadowCoordinator) -> None:
+    def __init__(self, entry_id: str, engine: ShadowCoordinator,
+                 profile: str = SHADOW) -> None:
         self.engine = engine
-        presentation = household_presentation(entry_id)
+        self.profile = profile
+        presentation = household_presentation(entry_id, profile)
         self._attr_unique_id = presentation.unique_id
         self._attr_name = presentation.name
 
@@ -129,7 +136,7 @@ class ShadowHouseholdSensor(SensorEntity):
         assessment = self.engine.household_assessment()
         comparison = self.engine.legacy_comparison()
         return {
-            "mode": "shadow_only",
+            "mode": "shadow_only" if self.profile == SHADOW else "final",
             "do_not_use_for_automations": True,
             "not_a_production_alarm_entity": True,
             "all_away_internal": self.engine.all_away(),
