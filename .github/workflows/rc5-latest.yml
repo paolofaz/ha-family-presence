@@ -1,0 +1,121 @@
+name: Validate and publish RC5 Latest
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: family-presence-rc5-main-release
+  cancel-in-progress: false
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m unittest discover -s tests -v
+      - run: python -m compileall -q custom_components tests
+
+  validate-hacs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration
+
+  hassfest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exclude repository-only root HACS manifest from HA integration scan
+        run: rm manifest.json
+      - uses: home-assistant/actions/hassfest@master
+
+  publish-latest:
+    needs: [unit-tests, validate-hacs, hassfest]
+    if: github.repository == 'paolofaz/ha-family-presence'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify tested branch and integration manifest
+        shell: bash
+        run: |
+          CURRENT=$(git ls-remote --exit-code origin refs/heads/main | cut -f1)
+          if [ "$CURRENT" != "$GITHUB_SHA" ]; then
+            echo "::error::A newer main commit exists; refusing release"
+            exit 1
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path("custom_components/family_presence/manifest.json").read_text())
+          metadata = json.loads(Path("hacs.json").read_text())
+          assert manifest["domain"] == "family_presence"
+          assert manifest["version"] == "0.1.0rc5"
+          assert metadata["zip_release"] is True
+          assert metadata["content_in_root"] is True
+          assert json.loads(Path("manifest.json").read_text()) == manifest
+          assert metadata["filename"] == "family_presence.zip"
+          assert [x.name for x in Path("custom_components").iterdir() if x.is_dir()] == ["family_presence"]
+          PY
+      - name: Build and verify HACS flat ZIP asset
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          source = Path("custom_components/family_presence")
+          output = Path("family_presence.zip")
+          with ZipFile(output, "w", ZIP_DEFLATED) as archive:
+              for file in sorted(source.rglob("*")):
+                  if file.is_file() and "__pycache__" not in file.parts:
+                      archive.write(file, file.relative_to(source).as_posix())
+          with ZipFile(output) as archive:
+              paths = set(archive.namelist())
+              assert "manifest.json" in paths
+              assert "__init__.py" in paths
+              assert "config_flow.py" in paths
+              assert "family_presence/manifest.json" not in paths
+              assert json.loads(archive.read("manifest.json"))["version"] == "0.1.0rc5"
+              assert json.loads(archive.read("manifest.json")) == json.loads(Path("manifest.json").read_text())
+              print(f"Validated HACS ZIP with {len(paths)} integration files")
+          PY
+          sha256sum family_presence.zip
+      - name: Publish standard RC5 release as Latest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.1.0rc5 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            TAG_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v0.1.0rc5" --jq '.object.sha')
+            if [ "$TAG_SHA" != "$GITHUB_SHA" ]; then
+              echo "::error::RC5 tag already points to a different commit"
+              exit 1
+            fi
+            gh release upload v0.1.0rc5 family_presence.zip --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit v0.1.0rc5 --repo "$GITHUB_REPOSITORY" --prerelease=false --latest
+          else
+            gh release create v0.1.0rc5 family_presence.zip \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Family Presence v0.1.0rc5 — HACS installabile" \
+              --notes-file docs/rc5-release-it.md \
+              --latest
+          fi
+          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name')
+          ASSET=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/v0.1.0rc5" --jq '.assets[].name')
+          if [ "$LATEST" != "v0.1.0rc5" ] || [ "$ASSET" != "family_presence.zip" ]; then
+            echo "::error::Latest or ZIP asset could not be verified"
+            exit 1
+          fi
