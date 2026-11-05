@@ -108,15 +108,18 @@ class BagReturnCausalityTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(await self.bag_arrived(c))
         self.assertEqual(c.state("kid"), State.AWAY)
 
-    async def test_near_home_keeps_bag_origin_until_its_arrival(self):
+    async def test_watch_left_at_home_cannot_override_bag_trip(self):
         c = self.engine()
         c.runtime["kid"].state = State.HOME
         await self.bag_left(c)
         self.now += timedelta(seconds=3)
         self.inputs["watch"] = "on"
-        decision = await c.process("kid", Event.WATCH_SEEN, event_time=self.now)
-        self.assertEqual(decision.current, State.NEAR_HOME)
+        self.assertIsNone(await c.process(
+            "kid", Event.WATCH_SEEN, event_time=self.now,
+        ))
+        self.assertEqual(c.state("kid"), State.AWAY)
         self.assertTrue(c.runtime["kid"].bag_return_eligible)
+        self.assertIn("Uscita zaino", c.runtime["kid"].last_ignored_reason)
         self.assertEqual((await self.bag_arrived(c)).current, State.HOME)
         self.assertFalse(c.runtime["kid"].bag_return_eligible)
 
@@ -135,21 +138,21 @@ class BagReturnCausalityTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(await self.bag_arrived(c))
         self.assertEqual(c.state("kid"), State.NEAR_HOME)
 
-    async def test_watch_lost_from_near_home_revokes_bag_trip(self):
+    async def test_watch_lost_from_legacy_near_home_keeps_bag_trip(self):
         c = self.engine()
         c.runtime["kid"].state = State.HOME
         await self.bag_left(c)
+        # Simulate a provisional state created by v1.0 before this safeguard.
+        c.runtime["kid"].state = State.NEAR_HOME
         self.now += timedelta(seconds=3)
         self.inputs["watch"] = "on"
-        await c.process("kid", Event.WATCH_SEEN, event_time=self.now)
         self.now += timedelta(seconds=3)
         self.inputs["watch"] = "off"
         self.assertEqual((await c.process(
             "kid", Event.WATCH_LOST, event_time=self.now,
         )).current, State.AWAY)
-        self.assertFalse(c.runtime["kid"].bag_return_eligible)
-        self.assertIsNone(await self.bag_arrived(c))
-        self.assertEqual(c.state("kid"), State.AWAY)
+        self.assertTrue(c.runtime["kid"].bag_return_eligible)
+        self.assertEqual((await self.bag_arrived(c)).current, State.HOME)
 
     async def test_phone_departure_replaces_bag_reason_even_if_already_away(self):
         c = self.engine()
