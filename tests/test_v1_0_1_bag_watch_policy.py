@@ -132,6 +132,18 @@ class BagWatchHotfixTests(unittest.IsolatedAsyncioTestCase):
             "arianna", Event.BAG_ARRIVED, event_time=self.now,
         )).current, State.HOME)
 
+    async def test_restore_without_confirmed_bag_off_remains_conservative(self):
+        c = self.engine()
+        await self.departure(c)
+        c.runtime["arianna"].state = State.NEAR_HOME
+        snapshot = c.snapshot()
+        for bag_state in ("on", "unavailable", "unknown"):
+            self.inputs["bag"] = bag_state
+            restored = self.engine()
+            self.assertEqual(restored.restore_snapshot(snapshot), 1)
+            self.assertEqual(restored.state("arianna"), State.NEAR_HOME)
+            self.assertTrue(restored.runtime["arianna"].bag_return_eligible)
+
     async def test_snapshot_without_provenance_does_not_change_near_home(self):
         c = self.engine()
         await self.departure(c)

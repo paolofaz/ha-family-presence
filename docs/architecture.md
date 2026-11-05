@@ -90,7 +90,9 @@ riparte vuoto ed è l'unica fonte temporale delle decisioni Watch.
 
 Gli snapshot precedenti che riportano NEAR_HOME con
 `bag_return_eligible = true` vengono convertiti una sola volta
-al ripristino in AWAY, mantenendo il flag. Non vengono fabbricati
+al ripristino in AWAY **solo con zaino ancora OFF**, mantenendo il flag.
+Se lo zaino è ON o non disponibile il motore mantiene NEAR_HOME.
+Non vengono fabbricati
 eventi Watch/porta; la conversione può cambiare l'aggregato
 e richiede quindi attenzione alle automazioni dell'allarme.
 

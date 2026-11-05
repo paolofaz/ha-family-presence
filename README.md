@@ -273,8 +273,10 @@ dalle RC precedenti, **senza rinominare le entità esistenti**.
   Watch fittizia; un semplice evento fisico dopo il reboot
   non può confermare `home` senza un nuovo rilevamento valido.
   Eccezione correttiva dalla v1.0.1: un vecchio `near_home` salvato
-  con `bag_return_eligible: true` viene normalizzato ad `away`,
-  **conservando il diritto di rientro dello zaino**. Questa correzione
+  con `bag_return_eligible: true` viene normalizzato ad `away`
+  **solo se lo zaino risulta ancora OFF**,
+  conservando il diritto di rientro. Se lo zaino è ON o non disponibile,
+  rimane `near_home` per non dichiarare falsa assenza al riavvio. Questa correzione
   può portare l'aggregato «Casa certamente vuota» a ON: verificare
   le automazioni dell'allarme prima dell'aggiornamento.
   È sempre possibile un rientro iPhone o la correzione manuale.

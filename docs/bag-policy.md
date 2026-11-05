@@ -42,7 +42,9 @@ pomeriggio, fuori dalla fascia di uscita.
 
 **Migrazione degli stati esistenti:** un vecchio snapshot v1.0.0 con
 NEAR_HOME e `bag_return_eligible = true` viene corretto in AWAY
-al riavvio, mantenendo il diritto di rientro dello zaino.
+al riavvio **solo se lo zaino è ancora confermato OFF**,
+mantenendo il diritto di rientro. Se lo zaino risulta ON o
+non disponibile, lo stato resta NEAR_HOME in modo conservativo.
 Poiché questo può modificare «Casa certamente vuota», controllare
 le automazioni dell'allarme quando si installa l'aggiornamento.
 Se il Watch diventa OFF da un NEAR_HOME preesistente mentre il flag
