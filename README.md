@@ -554,7 +554,7 @@ This is a **community-maintained custom integration**, not an official Home Assi
 
 For repository authors, see the official [Marketplace catalog submission guide](https://contributors.home-assistant.io/marketplace/guides/catalog/).
 
-# 🍺 Support the Project
+## 🍺 Support the Project
 
 If you found this project useful and want to support my work, you can offer me a beer:
 
