@@ -1,4 +1,4 @@
-# Architettura Family Presence v1.0.0
+# Architettura Family Presence v1.0.1
 
 La FSM è composta da livelli senza cicli di retroazione:
 
@@ -55,9 +55,13 @@ Una transizione ON→OFF dentro la fascia e i giorni configurati
 può stabilire AWAY se non già AWAY. Una transizione OFF→ON
 può riportare HOME solo se `bag_return_eligible` è stato
 acquisito con quell'uscita ed è ancora valido.
-Watch → NEAR_HOME conserva provvisoriamente il diritto;
-iPhone o correzioni manuali autorevoli possono revocarlo.
-Lo zaino OFF non pone un veto permanente ad altri rientri.
+In v1.0.1, quando `bag_return_eligible` è attivo,
+Watch ON e PHYSICAL_ENTRY non possono stabilire NEAR_HOME/HOME:
+si evita che un Watch lasciato a casa e un accesso condiviso
+sovrascrivano la partenza dello zaino. Il bag flag non è un blocco
+assoluto: un ingresso iPhone valido o una correzione manuale
+possono revocarlo. Il bag OFF in sé non è un veto: conta soltanto
+la partenza effettivamente riconosciuta e ancora autorevole.
 
 ## Salvataggi
 
@@ -83,6 +87,12 @@ I dati ripristinati servono solo alla UI: `_physical`
 riparte vuoto ed è l'unica fonte temporale delle decisioni Watch.
 
 ## Riavvio e confidenza
+
+Gli snapshot precedenti che riportano NEAR_HOME con
+`bag_return_eligible = true` vengono convertiti una sola volta
+al ripristino in AWAY, mantenendo il flag. Non vengono fabbricati
+eventi Watch/porta; la conversione può cambiare l'aggregato
+e richiede quindi attenzione alle automazioni dell'allarme.
 
 Uno stato ripristinato, anche AWAY, conta come il suo valore
 per retrocompatibilità con le automazioni dell'utente.

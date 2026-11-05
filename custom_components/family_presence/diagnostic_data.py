@@ -89,7 +89,7 @@ def build_diagnostics(engine, access_history=None) -> dict:
     assessment = engine.household_assessment()
     return {
         "report_format": 1,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "privacy": "Anonymized people and source identifiers; includes event timestamps",
         "household": {
             "all_away": engine.all_away(),

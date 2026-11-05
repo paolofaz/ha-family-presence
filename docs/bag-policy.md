@@ -1,4 +1,4 @@
-# Zaino — comportamento condizionato all'uscita (RC6)
+# Zaino — comportamento condizionato all'uscita (v1.0.1)
 
 La FSM registra eventi reali dallo zaino BLE, senza dedurre movimenti
 dalla sola presenza persistente del sensore. Il motore non accende o spegne
@@ -15,8 +15,10 @@ Uno zaino che passa **ON → OFF** imposta la persona su **AWAY** se:
 
 Se lo zaino provoca davvero AWAY, la FSM registra per quella persona un
 indicatore causale `bag_return_eligible = true`. Non è un blocco manuale:
-un successivo evento valido di iPhone, Watch o una correzione manuale può
-aggiornare normalmente lo stato e togliere il diritto di rientro allo zaino.
+un successivo rientro iPhone valido o una correzione manuale può aggiornare
+normalmente lo stato e togliere il diritto di rientro allo zaino.
+Il semplice Watch ON e un accesso fisico condiviso **non possono**
+sovrascrivere questa uscita mentre il flag resta `true`.
 
 ## Rientro
 
@@ -31,15 +33,26 @@ La FSM non confronta testi tradotti come `"Zaino uscito"`, ma un
 flag di provenienza aggiornato dagli eventi. Un nuovo iPhone AWAY quando
 lo stato era già AWAY revoca comunque il diritto dello zaino di marcare HOME.
 
-**Caso NEAR_HOME:** se il Watch è stato rilevato e ha portato la persona da
-AWAY (zaino) a NEAR_HOME senza confermare il rientro, la successiva rilevazione
-dello zaino può confermare HOME. Se invece il Watch si perde nuovamente,
-la FSM torna AWAY e revoca quel diritto.
+**Watch lasciato in casa (correzione v1.0.1):** dopo un'uscita causata
+dallo zaino, il Watch lasciato in carica può accendersi anche mentre
+la persona è a scuola. Con `bag_return_eligible = true`, Watch ON e
+gli ingressi condivisi non possono passare a NEAR_HOME o HOME. Rimane AWAY.
+Il successivo OFF→ON dello zaino può ancora confermare HOME anche nel
+pomeriggio, fuori dalla fascia di uscita.
+
+**Migrazione degli stati esistenti:** un vecchio snapshot v1.0.0 con
+NEAR_HOME e `bag_return_eligible = true` viene corretto in AWAY
+al riavvio, mantenendo il diritto di rientro dello zaino.
+Poiché questo può modificare «Casa certamente vuota», controllare
+le automazioni dell'allarme quando si installa l'aggiornamento.
+Se il Watch diventa OFF da un NEAR_HOME preesistente mentre il flag
+è attivo, il ritorno ad AWAY conserva la provenienza dello zaino.
 
 **Forzatura manuale AWAY:** non autorizza il rientro dello zaino. Una
 correzione manuale non può essere annullata da una semplice riconnessione BLE
 dello zaino. Un successivo iPhone HOME o Watch con evidenze fisiche valide
-può invece marcare HOME.
+può invece marcare HOME se non è attiva un'altra uscita autorevole
+causata dallo zaino.
 
 **HOME già confermato:** un altro evento ON dello zaino viene ignorato,
 senza riscrivere motivo e data dell'ultimo cambio di presenza.
@@ -47,7 +60,7 @@ senza riscrivere motivo e data dell'ultimo cambio di presenza.
 ## Riavvii e aggiornamento da RC5
 
 Il flag viene salvato nella snapshot della FSM assieme allo stato, usando
-un campo opzionale del formato 5. Dopo un riavvio RC6, una partenza causata
+un campo opzionale del formato 5. Dopo un riavvio v1.0.1, una partenza causata
 dallo zaino conserva il diritto di rientro anche da NEAR_HOME.
 
 Le snapshot RC5 non contengono il flag. Per prudenza, dopo il **primo**
@@ -57,8 +70,11 @@ un normale evento di iPhone/Watch o un intervento manuale. Dopo una nuova
 uscita reale dello zaino, il ciclo torna completamente automatico.
 
 Un recupero `unavailable → on` o `unknown → on` non è un vero OFF → ON:
-l'adapter continua a ignorarlo. Lo zaino OFF permanente non impedisce agli
-altri sensori di determinare un rientro.
+l'adapter continua a ignorarlo. Lo zaino OFF permanente non impedisce
+un autentico rientro iPhone o una correzione manuale. La restrizione
+sul Watch dipende dal **flag causale** e non dalla sola lettura OFF dello
+zaino: senza una partenza accettata, Watch e ingressi fisici mantengono
+la loro normale logica.
 
 ## Configurazione e orari
 
@@ -79,6 +95,8 @@ non ci sono due modalità di precedenza della presenza.
 
 Verificare almeno un'uscita vera nella fascia configurata e il successivo
 rientro, una disconnessione BLE dello zaino mentre iPhone segnala AWAY,
-il percorso AWAY → NEAR_HOME → HOME e il riavvio di HA dopo BAG_LEFT.
+il Watch lasciato in casa che resta AWAY, il riavvio dopo BAG_LEFT,
+la normalizzazione di un vecchio NEAR_HOME con flag true e il rientro
+zaino OFF→ON nel pomeriggio.
 L'attributo `bag_return_eligible` del sensore individuale mostra il valore
 attuale della condizione.

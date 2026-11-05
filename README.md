@@ -4,8 +4,8 @@
 finiti (FSM) indipendente per ciascuna persona. Integra iPhone, Apple Watch
 rilevati via BLE, eventuali zaini BLE ed eventi fisici della casa.
 
-**Versione stabile: 1.0.0** · Integrazione custom per Home Assistant ·
-Licenza MIT · [Release e changelog](docs/v1.0.0-release-it.md)
+**Versione stabile: 1.0.1** · Integrazione custom per Home Assistant ·
+Licenza MIT · [Release e changelog](docs/v1.0.1-release-it.md)
 
 > **Principio di sicurezza:** Family Presence calcola la presenza e rende
 > disponibili entità di sola lettura. Non comanda direttamente allarmi,
@@ -68,7 +68,7 @@ resta di competenza di `person.*` o di sensori template YAML per la dashboard.
    e configura **Family Presence**.
 
 Per aggiornare dalla RC8 o da una RC precedente: **aggiorna da HACS e riavvia**.
-Non eliminare e ricreare l'integrazione. La v1.0.0 conserva i suoi
+Non eliminare e ricreare l'integrazione. La v1.0.1 conserva i suoi
 `unique_id`, il dispositivo virtuale `Casa`, le associazioni sorgente,
 gli stati e i salvataggi compatibili. L'`entity_id` effettivo può
 contenere ancora `shadow` per ragioni storiche: prima di rinominarlo
@@ -80,7 +80,7 @@ del repository e nella cartella dell'integrazione.
 
 ### Installazione manuale
 
-Dall'archivio sorgente del tag `v1.0.0` copia la directory
+Dall'archivio sorgente del tag `v1.0.1` copia la directory
 `custom_components/family_presence/` sotto
 `<config_home_assistant>/custom_components/family_presence/`.
 Riavvia, poi configura dall'interfaccia.
@@ -174,7 +174,10 @@ fisiche usa **Riconfigura**. Per gli orari e le finestre usa **Configura**.
   con l'attributo `last_seen_before_off`, o dall'allarme inserito `armed_away`.
 - **Watch ON** da `away` attende due secondi e verifica che il segnale
   sia ancora ON. Se trova un evento recente di porta, sblocco o cancello,
-  conferma `home`; altrimenti passa a `near_home`.
+  conferma `home`; altrimenti passa a `near_home`. **Eccezione fondamentale:**
+  se l'uscita `away` è stata determinata dallo zaino e il diritto di
+  rientro dello zaino è ancora attivo, il Watch lasciato a casa
+  **non può** attivare `near_home` o `home`, neppure con un accesso condiviso.
 - **Watch OFF** da `near_home` non ancora confermato → `away`.
 - **Evento fisico successivo** da `near_home` può confermare `home`
   soltanto se il Watch è ancora ON e il suo rilevamento personale
@@ -194,13 +197,17 @@ la FSM usa dati probabilistici, non garantisce sicurezza antintrusione.
   registra internamente `bag_return_eligible = true`.
 - `OFF → ON` può confermare `home` soltanto se tale diritto è ancora
   valido e la persona è `away` o `near_home`.
-- Un nuovo evento iPhone, Watch o una forzatura manuale possono
+- Un rientro iPhone realmente rilevato o una forzatura manuale possono
   sostituire la precedente causa d'uscita; `bag_return_eligible`
-  torna a `false`.
+  torna a `false`. Il solo Watch ON non può sostituirla.
+- La **fascia oraria vale soltanto per la partenza** ON→OFF dello zaino,
+  mai per la successiva riaccensione del Watch o per il rientro dello zaino.
 - Un recupero da `unknown`/`unavailable` a `on`/`off` non è
   un attraversamento reale e non provoca movimenti inventati.
-- Uno zaino stabilmente OFF **non impedisce** a iPhone/Watch
-  di stabilire un rientro.
+- Uno zaino stabilmente OFF **non impedisce** a un autentico ingresso
+  iPhone o a una forzatura manuale di stabilire `home`. Se invece
+  `bag_return_eligible` è `true`, Watch ON e accessi fisici condivisi
+  **non sono prove sufficienti** per un rientro.
 
 L'attributo `bag_return_eligible` sui sensori personali con zaino
 è una spiegazione della regola, **non** la lettura ON/OFF del beacon.
@@ -265,6 +272,11 @@ dalle RC precedenti, **senza rinominare le entità esistenti**.
 - **`near_home` ripristinato:** non recupera un'età di rilevamento
   Watch fittizia; un semplice evento fisico dopo il reboot
   non può confermare `home` senza un nuovo rilevamento valido.
+  Eccezione correttiva dalla v1.0.1: un vecchio `near_home` salvato
+  con `bag_return_eligible: true` viene normalizzato ad `away`,
+  **conservando il diritto di rientro dello zaino**. Questa correzione
+  può portare l'aggregato «Casa certamente vuota» a ON: verificare
+  le automazioni dell'allarme prima dell'aggiornamento.
   È sempre possibile un rientro iPhone o la correzione manuale.
 
 Questa scelta privilegia l'assenza di **falsi eventi sintetici**
@@ -357,7 +369,9 @@ Dopo un aggiornamento importante prova nella tua installazione reale:
 - `away → near_home` (aggregato OFF) e successiva conferma `home`.
 - Un'apertura tardiva di porta quando `near_home` è vecchio:
   non deve causare `home` fittizio.
-- Un ciclo zaino `ON → OFF → ON` nella fascia di uscita.
+- Un ciclo zaino `ON → OFF → ON`: solo la partenza nella fascia.
+- Un'uscita zaino valida con Watch lasciato a casa: Watch ON e porta
+  aperta da altri non devono spostare la persona da `away`.
 - Un riavvio con qualcuno `away` e/o `near_home`.
 - Gli ultimi eventi accessi, distinti per cancelletto,
   carrabile, porta e serratura.
@@ -373,6 +387,7 @@ I test automatici coprono la logica e la struttura HACS;
 | Una persona rimane `near_home` | Attendi un nuovo evento valido; nessun timeout automatico cambia lo stato. Un accesso condiviso fuori finestra non basta. |
 | Dopo il reboot `away` sembra vecchio | Controlla `restored_unverified_members`, iPhone/Watch e, se necessario, usa il pulsante manuale. |
 | `bag_return_eligible: false` | Non è un errore BLE: indica soltanto che lo zaino non può confermare da solo il rientro. |
+| Watch acceso ma persona `away` con `bag_return_eligible: true` | È previsto se lo zaino è uscito correttamente e il Watch è rimasto a casa. Si attende lo zaino, un autentico evento iPhone oppure una forzatura. |
 | «Casa certamente vuota» è OFF | Almeno una persona non è `away`, oppure ha stato non determinato. |
 | Un impulso di cancello appare ma non è aperto | Gli impulsi non equivalgono a contatti di apertura; usa il sensore fisico vero per conoscere lo stato. |
 | Non compare «Ultimi eventi accessi» | Configura almeno una sorgente fra cancello, contatto porta o serratura. |
@@ -388,7 +403,8 @@ o antintrusione.
 
 ## Documentazione e licenza
 
-- [Note di rilascio v1.0.0](docs/v1.0.0-release-it.md)
+- [Note di rilascio v1.0.1](docs/v1.0.1-release-it.md)
+- [Note della prima stabile v1.0.0](docs/v1.0.0-release-it.md)
 - [Architettura attuale](docs/architecture.md)
 - [Regole dello zaino](docs/bag-policy.md)
 - [Analisi sorgenti BLE](docs/ble-sources.md)

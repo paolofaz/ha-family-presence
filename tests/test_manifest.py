@@ -17,7 +17,7 @@ class ManifestTests(unittest.TestCase):
 
     def test_release_manifest_version_matches_v1(self):
         manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["version"], "1.0.0")
+        self.assertEqual(manifest["version"], "1.0.1")
 
 
 if __name__ == "__main__":
