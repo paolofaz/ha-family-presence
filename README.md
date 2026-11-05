@@ -554,6 +554,14 @@ This is a **community-maintained custom integration**, not an official Home Assi
 
 For repository authors, see the official [Marketplace catalog submission guide](https://contributors.home-assistant.io/marketplace/guides/catalog/).
 
+# 🍺 Support the Project
+
+If you found this project useful and want to support my work, you can offer me a beer:
+
+[![Buy Me a Beer](https://img.shields.io/badge/Buy%20Me%20a%20Beer-0070ba?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/PaoloFazari)
+
+
+
 ## License
 
 Distributed under the [MIT License](LICENSE).
