@@ -400,12 +400,15 @@ class ShadowCoordinator:
                 except ValueError:
                     pass
             rt.near_home_entered_at = None
-            if saved_state == State.NEAR_HOME and rt.bag_return_eligible:
+            if (saved_state == State.NEAR_HOME and rt.bag_return_eligible
+                    and self._read(self.people[key].bag) == "off"):
                 # v1.0.0 could incorrectly enter NEAR_HOME when a Watch was
                 # charging at home while a school backpack trip remained
-                # authoritative. Correct ONLY this known causal contradiction
-                # on upgrade; preserve eligibility for the real bag return.
-                # This is a policy migration, never a replayed BLE event.
+                # authoritative. Correct ONLY with a currently confirmed OFF
+                # backpack: unavailable/ON cannot justify an AWAY assertion
+                # on boot, which could otherwise trigger external alarms.
+                # Preserve eligibility for the real bag return. This is a
+                # policy migration, never a replayed BLE event.
                 rt.state = State.AWAY
                 rt.last_reason = "Uscita zaino ancora attiva: Watch non conferma il rientro"
                 rt.reason_origin = "saved_snapshot_policy_correction"
