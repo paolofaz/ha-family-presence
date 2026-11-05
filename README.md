@@ -94,9 +94,9 @@ You may configure a member with a phone only, a Watch only, a bag only, or a com
 
 Phone tracking, BLE advertisements, receivers, timeouts, and geofences must be configured in their **source integrations**. Their reliability directly affects the quality of FSM decisions.
 
-## Installation
-
 <!-- ha-marketplace:exclude-start -->
+
+## Installation
 
 ### Home Assistant Marketplace (Home Assistant 2026.11 and later)
 
