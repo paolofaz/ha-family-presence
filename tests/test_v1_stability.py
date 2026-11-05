@@ -225,7 +225,7 @@ class V1DiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         ))
         report = await async_get_config_entry_diagnostics(None, entry)
         self.assertEqual(report, build_diagnostics(self.engine, self.history))
-        self.assertEqual(report["version"], "1.0.1")
+        self.assertEqual(report["version"], "1.0.2")
 
 
 if __name__ == "__main__":

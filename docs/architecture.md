@@ -1,4 +1,4 @@
-# Architettura Family Presence v1.0.1
+# Architettura Family Presence v1.0.2
 
 La FSM è composta da livelli senza cicli di retroazione:
 

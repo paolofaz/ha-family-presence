@@ -28,7 +28,7 @@ class HacsV1PackagingTests(unittest.TestCase):
             manifest,
             "The root manifest must exactly match the shipped integration",
         )
-        self.assertEqual(manifest["version"], "1.0.1")
+        self.assertEqual(manifest["version"], "1.0.2")
 
     def test_hacs_update_repository_skips_missing_directory_lookup(self):
         """Model the early HACS integration.py manifest_path decision.
@@ -66,7 +66,7 @@ class HacsV1PackagingTests(unittest.TestCase):
             self.assertIn("config_flow.py", names)
             self.assertNotIn("family_presence/manifest.json", names)
             manifest = json.loads(archive.read("manifest.json"))
-            self.assertEqual(manifest["version"], "1.0.1")
+            self.assertEqual(manifest["version"], "1.0.2")
 
 
 if __name__ == "__main__":

@@ -15,7 +15,7 @@ It is designed for homes where people sometimes leave a phone or watch charging,
 > [!IMPORTANT]
 > **Family Presence determines presence; it does not control your home.** It never arms or disarms an alarm, locks or unlocks doors, changes heating, or writes to legacy presence helpers. You choose what to automate using its Home Assistant entities.
 
-**Current stable version:** [v1.0.1](https://github.com/paolofaz/ha-family-presence/releases/tag/v1.0.1) · **Type:** custom integration · **License:** MIT
+**Current stable version:** [v1.0.2](https://github.com/paolofaz/ha-family-presence/releases/tag/v1.0.2) · **Type:** custom integration · **License:** MIT
 
 ## At a glance
 
@@ -288,7 +288,7 @@ These are **logic examples**, not a guarantee about how each Bluetooth or GPS pr
 
 ## Entities created
 
-Entity display names in v1.0.1 include some **Italian labels** retained for compatibility with existing installations. Actual `entity_id` values are assigned by Home Assistant and can vary by household name, prior registry entries, or manual renaming. **Never copy an assumed entity ID into an alarm automation without checking it.**
+Entity display names in v1.0.2 include some **Italian labels** retained for compatibility with existing installations. Actual `entity_id` values are assigned by Home Assistant and can vary by household name, prior registry entries, or manual renaming. **Never copy an assumed entity ID into an alarm automation without checking it.**
 
 | Entity | One per | Purpose |
 | --- | --- | --- |
@@ -443,7 +443,7 @@ If a member actually returned while Home Assistant was offline, the saved `away`
 - **From Beta/RC releases:** update in place. Existing member identities, entity-registry unique IDs, and compatible stored states are preserved by the migration logic.
 - Some historical `entity_id` values may still contain `shadow` after upgrading. That is a registry naming detail, **not** an indication that the live integration is running in shadow mode. Review dashboard and automation references before renaming entities.
 
-For the specific v1.0.1 correction, see [release notes](docs/v1.0.1-release-it.md).
+For the specific v1.0.1 correction, see [its release notes](docs/v1.0.1-release-it.md). The [v1.0.2 release](docs/v1.0.2-release-en.md) contains **no additional FSM behavior changes**.
 
 ## Diagnostics, logging, and privacy
 
@@ -529,7 +529,7 @@ custom_components/family_presence/
 
 Source code is organized to keep FSM decisions independent of Home Assistant service calls. Tests cover transition rules, backpack causality, snapshot compatibility, event ordering, entity behavior, source filtering, and packaging.
 
-**Latest validated stable code:** v1.0.1 · **226 automated unit tests** at the stable release, plus HACS validation and Home Assistant hassfest.
+**Latest validated stable code:** v1.0.2 · **226 automated unit tests** at the stable release, plus HACS validation and Home Assistant hassfest.
 
 To run the unit tests from the repository root:
 
@@ -542,6 +542,7 @@ Additional documentation:
 
 - [Architecture](docs/architecture.md)
 - [Backpack rules and precedence](docs/bag-policy.md)
+- [v1.0.2 release notes](docs/v1.0.2-release-en.md)
 - [v1.0.1 release notes](docs/v1.0.1-release-it.md)
 - [v1.0.0 original stable release](docs/v1.0.0-release-it.md)
 - [All releases](https://github.com/paolofaz/ha-family-presence/releases)
