@@ -79,15 +79,23 @@ def decide(
     """Gate a backpack arrival on a verified backpack-caused absence.
 
     The coordinator tracks causal provenance independently of reason strings.
-    WATCH_SEEN may move an eligible AWAY to NEAR_HOME without discarding the
-    backpack trip; unrelated and manual departures cannot be resolved by bag ON.
-    All non-bag sensor events remain valid even if the backpack is absent.
+    A backpack-caused absence cannot be overturned by a Watch detected at
+    home or by shared door/gate evidence while that trip is unresolved.
+    A real iPhone HOME event or manual HOME still confirms a return without
+    the bag. An unrelated/manual departure cannot be resolved by bag ON.
     """
     if event == Event.MANUAL_HOME:
         return Decision(State.HOME, "Forzato in casa manualmente")
     if event == Event.MANUAL_AWAY:
         return Decision(State.AWAY, "Forzato fuori casa manualmente")
     if event == Event.RECONCILE:
+        return None
+
+    # Causal provenance, not the current bag BLE reading, governs this
+    # safeguard. A Watch left at home may switch ON while its owner is away.
+    # Even a shared door event must not turn this into a false HOME.
+    if (bag_return_eligible and current in (State.AWAY, State.NEAR_HOME)
+            and event in (Event.WATCH_SEEN, Event.PHYSICAL_ENTRY)):
         return None
 
     if event == Event.IPHONE_LEFT:

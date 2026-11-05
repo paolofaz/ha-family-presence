@@ -400,6 +400,16 @@ class ShadowCoordinator:
                 except ValueError:
                     pass
             rt.near_home_entered_at = None
+            if saved_state == State.NEAR_HOME and rt.bag_return_eligible:
+                # v1.0.0 could incorrectly enter NEAR_HOME when a Watch was
+                # charging at home while a school backpack trip remained
+                # authoritative. Correct ONLY this known causal contradiction
+                # on upgrade; preserve eligibility for the real bag return.
+                # This is a policy migration, never a replayed BLE event.
+                rt.state = State.AWAY
+                rt.last_reason = "Uscita zaino ancora attiva: Watch non conferma il rientro"
+                rt.reason_origin = "saved_snapshot_policy_correction"
+                rt.last_changed = _aware_utc(self._clock())
 
             manual = record.get("manual") if data["format"] in (4, 5) else None
             if isinstance(manual, dict):
@@ -579,6 +589,17 @@ class ShadowCoordinator:
                 self._record_ignored(person, event, at, "Zaino non più presente: evento obsoleto")
                 return None
 
+            if (rt.bag_return_eligible
+                    and rt.state in (State.AWAY, State.NEAR_HOME)
+                    and event in (Event.WATCH_SEEN, Event.PHYSICAL_ENTRY)):
+                # A Watch charging at home and another family member opening
+                # the door cannot supersede the accepted school bag departure.
+                self._record_ignored(
+                    person, event, at,
+                    "Uscita zaino ancora attiva: Watch e accessi condivisi non confermano il rientro",
+                )
+                return None
+
             if event == Event.PHYSICAL_ENTRY and rt.state == State.NEAR_HOME:
                 # A generic door/lock/gate transition is shared by all people.
                 # It must not resolve a stale Watch near-home observation, or a
@@ -648,10 +669,13 @@ class ShadowCoordinator:
                 # Only a departure which actually establishes AWAY grants
                 # this bag the right to confirm the next arrival.
                 rt.bag_return_eligible = previous != State.AWAY
-            elif not (event == Event.WATCH_SEEN and previous == State.AWAY
-                      and result.state == State.NEAR_HOME):
-                # Watch proximity is provisional; retain the known bag trip.
-                # Other applied events, including manual AWAY, supersede it.
+            elif not (event == Event.WATCH_LOST
+                      and previous == State.NEAR_HOME
+                      and result.state == State.AWAY
+                      and rt.bag_return_eligible):
+                # A legacy provisional Watch return reverting to AWAY must
+                # not revoke the independent, still-active bag trip. Other
+                # accepted events (including manual commands) supersede it.
                 rt.bag_return_eligible = False
             self._refresh_comparison(person)
             rt.last_reason = result.reason

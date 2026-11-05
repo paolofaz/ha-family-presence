@@ -64,16 +64,24 @@ def assess_household(engine: ShadowCoordinator) -> HouseholdAssessment:
             divergent.append(key)
 
         # Advisory only; these readings NEVER alter the authoritative verdict.
+        # During a verified backpack-caused absence, phone/Watch may correctly
+        # have been left charging at home. Do not label that normal family
+        # situation as a contradictory presence warning.
+        bag_out_trip = (
+            state is State.AWAY and bool(person.bag)
+            and person.bag_schedule.enabled and rt.bag_return_eligible
+            and engine._read(person.bag) == "off"
+        )
         warnings: list[str] = []
         if person.iphone:
             iphone = engine._read(person.iphone)
-            if state is State.AWAY and iphone == "home":
+            if state is State.AWAY and iphone == "home" and not bag_out_trip:
                 warnings.append("iphone_home_con_fsm_away")
             elif iphone in (None, "unknown", "unavailable"):
                 warnings.append("iphone_non_disponibile")
         if person.watch:
             watch = engine._read(person.watch)
-            if state is State.AWAY and watch == "on":
+            if state is State.AWAY and watch == "on" and not bag_out_trip:
                 warnings.append("watch_on_con_fsm_away")
             elif watch in (None, "unknown", "unavailable"):
                 warnings.append("watch_non_disponibile")
