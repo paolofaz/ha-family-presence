@@ -4,5 +4,6 @@
   "zip_release": true,
   "filename": "family_presence.zip",
   "hide_default_branch": true,
-  "content_in_root": true
+  "content_in_root": true,
+  "homeassistant": "2026.11.0"
 }
