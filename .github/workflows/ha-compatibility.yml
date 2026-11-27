@@ -1,0 +1,43 @@
+name: Home Assistant supported baseline
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'custom_components/**'
+      - 'hacs.json'
+      - '.github/workflows/ha-compatibility.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  import-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: Install declared Home Assistant baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(python -c 'import json; print(json.load(open("hacs.json"))["homeassistant"])')"
+          python -m pip install "homeassistant==$VERSION"
+      - name: Import integration against actual HA Core
+        run: |
+          python - <<'PY'
+          import importlib
+          import importlib.metadata
+          import json
+          from pathlib import Path
+          version = json.loads(Path("hacs.json").read_text())["homeassistant"]
+          assert importlib.metadata.version("homeassistant") == version
+          package = "custom_components.family_presence"
+          importlib.import_module(package)
+          for module in sorted(Path("custom_components/family_presence").glob("*.py")):
+              if module.stem != "__init__":
+                  importlib.import_module(f"{package}.{module.stem}")
+          print(f"{package}: import smoke passed against HA Core {version}")
+          PY
