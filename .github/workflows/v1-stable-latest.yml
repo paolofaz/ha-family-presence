@@ -52,7 +52,7 @@ jobs:
         run: |
           CURRENT=$(git ls-remote --exit-code origin refs/heads/main | cut -f1)
           if [ "$CURRENT" != "$GITHUB_SHA" ]; then
-            echo "::error::A newer main commit exists; refusing release"
+            echo "A newer main commit exists; refusing release"
             exit 1
           fi
           python - <<'PY'
@@ -101,13 +101,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view v1.0.2 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            TAG_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v1.0.2" --jq '.object.sha')
-            if [ "$TAG_SHA" != "$GITHUB_SHA" ]; then
-              echo "::error::v1.0.2 tag already points to a different commit"
-              exit 1
-            fi
-            gh release upload v1.0.2 family_presence.zip --repo "$GITHUB_REPOSITORY" --clobber
-            gh release edit v1.0.2 --repo "$GITHUB_REPOSITORY" --prerelease=false --latest
+            echo "v1.0.2 already published; preserving immutable tag and ZIP asset."
           else
             gh release create v1.0.2 family_presence.zip \
               --repo "$GITHUB_REPOSITORY" \
