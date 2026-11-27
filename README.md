@@ -71,6 +71,8 @@ This is a strict **FSM-state aggregation**, not an independent physical occupanc
 
 ## Requirements and supported inputs
 
+The maintained Home Assistant baseline is **2026.11.0** (declared in `hacs.json`). Earlier versions are not certified; an automated import check uses the declared HA Core version.
+
 You need a working Home Assistant instance and **at least one personal presence source per member**. Family Presence consumes entities created by other integrations; it does **not** perform Bluetooth scanning or GPS tracking itself.
 
 | Input | Home Assistant type | Required? | Used for |
@@ -110,7 +112,7 @@ Starting with Home Assistant **2026.11**, the former HACS store is built into Ho
 4. Restart Home Assistant if requested.
 5. Open **Settings → Devices & services → Add integration**, search for **Family Presence**, and start the setup wizard.
 
-### HACS (Home Assistant versions before 2026.11)
+### HACS (older Home Assistant installations — not certified)
 
 1. Open **HACS** and use **⋮ → Custom repositories**.
 2. Paste `https://github.com/paolofaz/ha-family-presence` and choose **Integration**.
